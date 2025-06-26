@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Inter, JetBrains_Mono } from "next/font/google";
+import { Playfair_Display, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/ui/sonner";
 import { QueryProvider } from "@/lib/query-client";
@@ -7,9 +7,10 @@ import { AuthProvider } from "@/lib/auth-context";
 import { Navbar } from "@/components/navbar";
 import { ThemeProvider } from 'next-themes';
 
-const inter = Inter({
+const playfairDisplay = Playfair_Display({
   subsets: ["latin"],
-  variable: "--font-inter",
+  variable: "--font-playfair-display",
+  weight: ["400", "700"],
 });
 
 const jetbrainsMono = JetBrains_Mono({
@@ -22,10 +23,16 @@ export const metadata: Metadata = {
   description: "Discover and create infinite stories with AI. Browse existing books or generate new ones tailored to your imagination.",
   keywords: ["AI", "books", "literature", "fiction", "library", "reading"],
   authors: [{ name: "MirageCodex" }],
+  icons: {
+    icon: "/favicon.ico",
+    shortcut: "/favicon.ico",
+    apple: "/logo.svg",
+  },
   openGraph: {
     title: "MirageCodex - The Infinite AI-Generated Library",
     description: "Discover and create infinite stories with AI. Browse existing books or generate new ones tailored to your imagination.",
     type: "website",
+    images: ["/logo.svg"],
   },
 };
 
@@ -36,7 +43,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${inter.variable} ${jetbrainsMono.variable} font-sans antialiased min-h-screen`}>
+      <body className={`${playfairDisplay.variable} ${jetbrainsMono.variable} font-serif antialiased min-h-screen`}>
         <ThemeProvider 
           attribute="class" 
           defaultTheme="system" 
@@ -46,14 +53,14 @@ export default function RootLayout({
           <div 
             className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 dark:from-slate-900 dark:to-slate-800"
             style={{
-              backgroundImage: 'url(/marble_texture.png)',
+              backgroundImage: 'url(/marbe-light-amber-texture.png)',
               backgroundSize: 'cover',
               backgroundPosition: 'center',
               backgroundAttachment: 'fixed'
             }}
           >
             {/* Dark mode overlay */}
-            <div className="hidden dark:block absolute inset-0 bg-gradient-to-br from-slate-900/95 to-slate-800/95" />
+            <div className="hidden dark:block absolute inset-0 bg-gradient-to-br from-amber-950/95 to-yellow-950/95" />
             
             <div className="relative z-10">
               <QueryProvider>

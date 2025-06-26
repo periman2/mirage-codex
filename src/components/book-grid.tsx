@@ -3,7 +3,7 @@
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { BookOpen, User, Clock } from 'lucide-react'
+import { Book, User, Clock } from 'iconoir-react'
 import { useState } from 'react'
 
 // Mock book data - in real app this would come from the database
@@ -134,7 +134,7 @@ export function BookGrid() {
           <div className={`aspect-[3/4] bg-gradient-to-br ${generateCoverGradient(book.id)} rounded-t-lg flex items-center justify-center relative overflow-hidden`}>
             <div className="absolute inset-0 bg-black/10 group-hover:bg-black/20 transition-colors" />
             <div className="text-center p-4 relative z-10">
-              <BookOpen className="w-12 h-12 text-white/80 mx-auto mb-2" />
+              <Book className="w-12 h-12 text-white/80 mx-auto mb-2" />
               <h3 className="text-white font-bold text-sm leading-tight line-clamp-3">
                 {book.title}
               </h3>

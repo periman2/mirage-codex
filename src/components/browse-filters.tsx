@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { useState } from 'react'
-import { X } from 'lucide-react'
+import { Xmark } from 'iconoir-react'
 
 // Mock data - in real app this would come from the database
 const mockLanguages = [
@@ -133,7 +133,7 @@ export function BrowseFilters() {
                   onClick={() => handleTagToggle(tag.slug)}
                 >
                   {tag.label}
-                  {isSelected && <X className="w-3 h-3 ml-1" />}
+                  {isSelected && <Xmark className="w-3 h-3 ml-1" />}
                 </Badge>
               )
             })}

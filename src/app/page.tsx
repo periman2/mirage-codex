@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { AuthDialog } from '@/components/auth-dialog'
 import { useAuth } from '@/lib/auth-context'
-import { BookOpen, Search, Lock } from 'lucide-react'
+import { Book, Search, Lock } from 'iconoir-react'
 import { useRouter } from 'next/navigation'
 
 export default function HomePage() {
@@ -33,8 +33,8 @@ export default function HomePage() {
           <ModeCard
             mode="browse"
             title="Browse"
-            icon={<BookOpen className="w-12 h-12 md:w-16 md:h-16" />}
-            description="Explore the infinite library of AI-generated books. Discover stories created by others, filter by genres, and dive into endless fictional worlds."
+            icon={<Book className="w-12 h-12 md:w-16 md:h-16" />}
+            description="Explore what others search. Memories of things to be."
             onClick={() => handleModeSelect('browse')}
           />
 
@@ -43,7 +43,7 @@ export default function HomePage() {
             mode="search"
             title="Search"
             icon={user ? <Search className="w-12 h-12 md:w-16 md:h-16" /> : <Lock className="w-12 h-12 md:w-16 md:h-16" />}
-            description="Create new books with AI. Enter your ideas, choose genres and themes, and watch as unique stories are generated just for you."
+            description="Search through the mirage of possibilities, become a part of the library's becoming"
             requiresAuth={!user}
             onClick={() => handleModeSelect('search')}
           />
@@ -73,55 +73,52 @@ function ModeCard({ mode, title, icon, description, requiresAuth, onClick }: Mod
       onClick={onClick}
       className={`
         group relative overflow-hidden
-        bg-amber-50/70 dark:bg-slate-800/70 
+        bg-amber-50/20 dark:bg-transparent 
         backdrop-blur-sm
-        rounded-2xl
-        border-2 border-amber-200/60 dark:border-amber-500/30
+        rounded-3xl
+        border-2 border-amber-900/80 dark:border-amber-200/90
         p-8 md:p-10
         text-center
         transition-all duration-500 ease-out
         hover:scale-105 hover:shadow-2xl 
         hover:shadow-amber-900/20 dark:hover:shadow-amber-400/10
-        hover:bg-amber-50/90 dark:hover:bg-slate-800/90
-        hover:border-amber-300/80 dark:hover:border-amber-400/50
+        hover:bg-amber-50/35 dark:hover:bg-transparent
+        hover:border-amber-800/90 dark:hover:border-amber-100/95
         focus:outline-none focus:ring-4 focus:ring-amber-200 dark:focus:ring-amber-500/30
         min-h-[200px] md:min-h-[240px]
         flex flex-col items-center justify-center
       `}
     >
       {/* Icon */}
-      <div className="mb-4 md:mb-6 text-amber-600 dark:text-amber-400 transition-all duration-500 ease-out group-hover:scale-110">
+      <div className="mb-4 md:mb-6 text-amber-600 dark:text-amber-400 transition-all duration-500 ease-out group-hover:scale-110 group-hover:-translate-y-3">
         {icon}
       </div>
 
-      {/* Title */}
-      <h2 className="text-3xl md:text-5xl font-bold text-slate-800 dark:text-amber-300 transition-all duration-500 ease-out group-hover:scale-105 mb-2">
+      {/* Title - moves up on hover */}
+      <h2 
+        className="text-2xl md:text-3xl font-bold text-slate-600 dark:text-amber-100 transition-all duration-500 ease-out group-hover:scale-105 group-hover:-translate-y-6 mb-2"
+        style={{ fontFamily: 'var(--font-playfair-display), serif' }}
+      >
         {requiresAuth ? 'Search' : title}
       </h2>
 
-      {/* Description - Hidden by default, shown on hover */}
+      {/* Description - slides in from bottom on hover */}
       <div className={`
-        absolute inset-0 
-        flex items-center justify-center
-        bg-amber-50/95 dark:bg-slate-800/95
-        backdrop-blur-sm
-        rounded-2xl
-        p-6 md:p-8
-        opacity-0 translate-y-4
-        group-hover:opacity-100 group-hover:translate-y-0
         transition-all duration-500 ease-out
-        pointer-events-none
+        opacity-0 translate-y-8
+        group-hover:opacity-100 group-hover:translate-y-0
+        absolute bottom-8 md:bottom-10 left-6 right-6 md:left-8 md:right-8
       `}>
-        <p className="text-slate-700 dark:text-slate-300 text-sm md:text-base leading-relaxed text-center">
+        <p className="text-slate-600 dark:text-amber-50 text-sm md:text-base leading-relaxed text-center">
           {requiresAuth 
-            ? 'Sign in to unlock AI-powered book generation. Create unique stories tailored to your imagination.'
+            ? 'Sign in to unlock search. Create unique books by searching them.'
             : description
           }
         </p>
       </div>
 
       {/* Subtle gradient overlay on hover */}
-      <div className="absolute inset-0 opacity-0 group-hover:opacity-5 transition-opacity duration-500 ease-out bg-gradient-to-br from-amber-400 to-amber-600 rounded-2xl" />
+      <div className="absolute inset-0 opacity-0 group-hover:opacity-5 transition-opacity duration-500 ease-out bg-gradient-to-br from-amber-400 to-amber-600 rounded-3xl" />
     </button>
   )
 }

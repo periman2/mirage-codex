@@ -2,7 +2,7 @@
 
 import { useTheme } from 'next-themes'
 import { useEffect, useState } from 'react'
-import { Moon, Sun } from 'lucide-react'
+import { SunLight, HalfMoon } from 'iconoir-react'
 import { Button } from './button'
 
 export function ThemeToggle() {
@@ -29,9 +29,9 @@ export function ThemeToggle() {
       className="w-9 h-9 p-0"
     >
       {theme === 'dark' ? (
-        <Sun className="h-4 w-4" />
+        <SunLight className="h-4 w-4" />
       ) : (
-        <Moon className="h-4 w-4" />
+        <HalfMoon className="h-4 w-4" />
       )}
       <span className="sr-only">Toggle theme</span>
     </Button>

@@ -12,7 +12,7 @@ import {
   SheetTrigger 
 } from './ui/sheet'
 import { useAuth } from '@/lib/auth-context'
-import { User, Settings, LogOut, CreditCard } from 'lucide-react'
+import { User, Settings, LogOut, CreditCard } from 'iconoir-react'
 
 export function UserMenu() {
   const { user, profile, signOut } = useAuth()
