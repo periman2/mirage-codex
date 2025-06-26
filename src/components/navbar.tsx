@@ -5,7 +5,7 @@ import { Button } from './ui/button'
 import { useAuth } from '@/lib/auth-context'
 import { AuthDialog } from './auth-dialog'
 import { UserMenu } from './user-menu'
-import { ThemeToggle } from './ui/theme-toggle'
+
 import { Menu, Xmark } from 'iconoir-react'
 
 export function Navbar() {
@@ -47,11 +47,11 @@ export function Navbar() {
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
-              <a href="/" className="w-20 h-20 flex items-center justify-center hover:opacity-80 transition-opacity">
+              <a href="/" className="w-24 h-24 flex items-center justify-center hover:opacity-80 transition-opacity">
                 <img 
                   src="/logo.svg" 
                   alt="MirageCodex Logo" 
-                  className="w-20 h-20 object-contain filter brightness-0 dark:brightness-0 dark:invert"
+                  className="w-24 h-24 object-contain filter brightness-0 dark:brightness-0 dark:invert"
                 />
               </a>
             </div>
@@ -70,8 +70,6 @@ export function Navbar() {
               >
                 Search {!user && '(Login Required)'}
               </button>
-              
-              <ThemeToggle />
               
               {loading ? (
                 <div className="w-8 h-8 rounded-full bg-amber-200 dark:bg-amber-800 animate-pulse" />
@@ -114,10 +112,6 @@ export function Navbar() {
               >
                 Search {!user && '(Login Required)'}
               </button>
-              
-              <div className="px-2 py-1">
-                <ThemeToggle />
-              </div>
               
               {loading ? (
                 <div className="px-2 py-1">
