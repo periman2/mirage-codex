@@ -1,4 +1,4 @@
-import { generateObject } from 'ai'
+import { generateObject, generateText, streamText } from 'ai'
 import { openai } from '@ai-sdk/openai'
 import { anthropic } from '@ai-sdk/anthropic'
 import { google } from '@ai-sdk/google'
@@ -21,6 +21,13 @@ function createModel(domain: string, modelName: string) {
     default:
       throw new Error(`Unsupported model domain: ${domain}`)
   }
+}
+
+/**
+ * Get AI provider for a given domain and model name (exported alias)
+ */
+export async function getAIProvider(domain: string, modelName: string) {
+  return createModel(domain, modelName)
 }
 
 // Schemas for structured generation
@@ -192,7 +199,148 @@ Generate books that feel like they could exist in a parallel universe's literary
 }
 
 /**
- * Generate content for a specific page of a book
+ * Generate content for a specific page of a book using streaming
+ */
+export async function generatePageStreaming(params: {
+  bookTitle: string
+  authorName: string
+  authorStyle: string
+  pageNumber: number
+  totalPages: number
+  sections: Array<z.infer<typeof SectionSchema>>
+  previousPageContent?: string
+  languageCode: string
+  modelName: string
+  modelDomain: string
+  onChunk: (chunk: string) => void
+  onFinish: (fullContent: string) => void
+  onError: (error: Error) => void
+}): Promise<void> {
+  console.log('🔄 Starting page generation streaming for page:', params.pageNumber)
+  
+  const model = createModel(params.modelDomain, params.modelName)
+
+  // Find which section this page belongs to
+  const currentSection = params.sections.find(section => 
+    params.pageNumber >= section.fromPage && params.pageNumber <= section.toPage
+  )
+  
+  if (!currentSection) {
+    const error = new Error(`No section found for page ${params.pageNumber}`)
+    params.onError(error)
+    return
+  }
+
+  // Calculate position within the section
+  const sectionProgress = (params.pageNumber - currentSection.fromPage) / (currentSection.toPage - currentSection.fromPage)
+  const isFirstPageOfSection = params.pageNumber === currentSection.fromPage
+  const isLastPageOfSection = params.pageNumber === currentSection.toPage
+
+  // Build context about genre and formatting based on book title and author style
+  const genreContext = getGenreFormattingHints(params.bookTitle, params.authorStyle)
+  
+  const systemPrompt = `You are writing page ${params.pageNumber} of ${params.totalPages} for the book "${params.bookTitle}" by ${params.authorName}.
+
+AUTHOR STYLE: ${params.authorStyle}
+
+CURRENT SECTION: ${currentSection.title}
+SECTION SUMMARY: ${currentSection.summary}
+SECTION PAGES: ${currentSection.fromPage}-${currentSection.toPage}
+POSITION IN SECTION: ${Math.round(sectionProgress * 100)}% through this section
+${isFirstPageOfSection ? 'THIS IS THE FIRST PAGE OF THIS SECTION' : ''}
+${isLastPageOfSection ? 'THIS IS THE LAST PAGE OF THIS SECTION' : ''}
+
+${params.previousPageContent ? `PREVIOUS PAGE CONTEXT: The previous page ended with this content:
+"${params.previousPageContent.slice(-200)}..."
+
+Continue naturally from where the previous page left off.` : ''}
+
+LANGUAGE: Write in language code "${params.languageCode}"
+
+FORMATTING & STYLE:
+${genreContext}
+- Use proper paragraph breaks and formatting
+- Include dialogue tags and narrative descriptions as appropriate
+- Use markdown formatting where it enhances readability (italics, bold, etc.)
+- Write approximately 250-400 words per page
+- Make the content immersive and engaging
+
+REQUIREMENTS:
+- Write authentic content that matches the author's style and book type
+- Make this page feel like part of the larger section and book
+- Maintain consistency with the book's genre and tone
+- Do not include page numbers or headers in the content
+- If first page of section, consider introducing the section topic appropriately
+- If last page of section, consider concluding the section naturally
+- Ensure smooth continuation from any previous page content
+
+Write compelling, immersive content that draws readers into this fictional world.`
+
+  let fullContent = ''
+
+  try {
+    const result = await streamText({
+      model,
+      system: systemPrompt,
+      prompt: `Write the content for page ${params.pageNumber}, which is ${Math.round(sectionProgress * 100)}% through the "${currentSection.title}" section.`,
+      temperature: 0.7,
+    })
+
+    for await (const delta of result.textStream) {
+      fullContent += delta
+      params.onChunk(delta)
+    }
+
+    console.log('✅ Page generation streaming completed')
+    params.onFinish(fullContent)
+    
+  } catch (error) {
+    console.error('❌ Page generation streaming failed:', error)
+    params.onError(error instanceof Error ? error : new Error('Unknown error'))
+  }
+}
+
+/**
+ * Get genre-specific formatting hints based on book title and author style
+ */
+function getGenreFormattingHints(bookTitle: string, authorStyle: string): string {
+  const title = bookTitle.toLowerCase()
+  const style = authorStyle.toLowerCase()
+  
+  // Detect likely genre/format based on title and style
+  if (title.includes('cookbook') || title.includes('recipe') || style.includes('cooking')) {
+    return `- Format as a cookbook with ingredient lists, step-by-step instructions
+- Use clear numbered steps and ingredient measurements
+- Include cooking tips and techniques`
+  }
+  
+  if (title.includes('manual') || title.includes('guide') || title.includes('how to')) {
+    return `- Format as a practical guide with clear instructions
+- Use numbered lists and bullet points where appropriate
+- Include helpful tips and warnings`
+  }
+  
+  if (title.includes('poetry') || title.includes('poems') || style.includes('poetic')) {
+    return `- Format as poetry with proper line breaks and stanza divisions
+- Use poetic language and imagery
+- Consider different poem forms and styles`
+  }
+  
+  if (title.includes('academic') || title.includes('research') || style.includes('scholarly')) {
+    return `- Format as academic text with formal language
+- Include theoretical discussions and analysis
+- Use academic tone and structure`
+  }
+  
+  // Default to narrative fiction
+  return `- Format as narrative prose with dialogue and descriptions
+- Use proper paragraph structure for readability
+- Include dialogue with proper formatting and tags
+- Balance action, dialogue, and description`
+}
+
+/**
+ * Generate content for a specific page of a book (legacy non-streaming version)
  */
 export async function generatePage(params: {
   bookTitle: string

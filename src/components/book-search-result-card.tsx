@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { Sparks } from 'iconoir-react'
 
 // Transform database result to frontend-friendly format
@@ -18,10 +19,16 @@ type SearchResultBook = {
   }
   language: string
   sections: any[]
+  edition: {
+    id: string
+    modelId: number
+    modelName: string
+  }
 }
 
 // Enhanced BookSearchResultCard component with proper loading states and shadow effects
 export function BookSearchResultCard({ book }: { book: SearchResultBook }) {
+  const router = useRouter()
   const [imageLoading, setImageLoading] = useState(true)
   const [imageError, setImageError] = useState(false)
 
@@ -34,8 +41,15 @@ export function BookSearchResultCard({ book }: { book: SearchResultBook }) {
     setImageError(true)
   }
 
+  const handleClick = () => {
+    router.push(`/book/${book.id}?edition=${book.edition.id}`)
+  }
+
   return (
-    <div className="group cursor-pointer transition-all duration-300 hover:scale-[1.02] shadow-lg hover:shadow-xl rounded-xl overflow-hidden">
+    <div 
+      onClick={handleClick}
+      className="group cursor-pointer transition-all duration-300 hover:scale-[1.02] shadow-lg hover:shadow-xl rounded-xl overflow-hidden"
+    >
       {/* Book Cover Container - Square format */}
       <div className="aspect-square w-full relative overflow-hidden shadow-sm">
         {/* Gradient background for light mode */}

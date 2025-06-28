@@ -46,8 +46,8 @@ export default function RootLayout({
       <body className={`${playfairDisplay.variable} ${jetbrainsMono.variable} font-serif antialiased min-h-screen`}>
         <ThemeProvider 
           attribute="class" 
-          defaultTheme="system" 
-          enableSystem 
+          defaultTheme="light" 
+          enableSystem={false}
           disableTransitionOnChange
         >
           <div 

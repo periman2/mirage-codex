@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/lib/auth-context'
 import { useLanguages, useGenres, useTags, useTagsByGenre, useModels } from '@/lib/queries'
@@ -34,6 +34,11 @@ type SearchResultBook = {
   }
   language: string
   sections: any[]
+  edition: {
+    id: string
+    modelId: number
+    modelName: string
+  }
 }
 
 interface SearchResult {
@@ -59,7 +64,7 @@ interface PaginatedSearchState {
   modelId: number
 }
 
-export default function SearchPage() {
+function SearchPageContent() {
   const { user } = useAuth()
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -646,7 +651,7 @@ export default function SearchPage() {
               </div>
               
               {/* Book Grid */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
                 {searchMutation.data.books.map((book) => (
                   <BookSearchResultCard key={book.id} book={book} />
                 ))}
@@ -696,5 +701,22 @@ export default function SearchPage() {
         </Card>
       </div>
     </div>
+  )
+}
+
+export default function SearchPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex h-[calc(100vh-4rem)] items-center justify-center bg-slate-100/30 dark:bg-slate-900/30">
+        <div className="text-center">
+          <Sparks className="h-12 w-12 text-amber-600 dark:text-amber-300 animate-spin mx-auto mb-4" />
+          <h3 className="text-xl font-semibold text-slate-800 dark:text-amber-100 mb-2">
+            Loading search page...
+          </h3>
+        </div>
+      </div>
+    }>
+      <SearchPageContent />
+    </Suspense>
   )
 } 
