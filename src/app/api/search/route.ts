@@ -212,6 +212,11 @@ export async function POST(request: NextRequest) {
         },
         language: result.language_code,
         sections: result.book_sections || [],
+        edition: {
+          id: result.edition_id,
+          modelId: result.model_id,
+          modelName: result.model_name,
+        },
       }))
 
       console.log('✅ Returning cached books:', books.length)
@@ -487,6 +492,11 @@ export async function POST(request: NextRequest) {
       },
       language: result.language_code,
       sections: result.book_sections || [],
+      edition: {
+        id: result.edition_id,
+        modelId: result.model_id,
+        modelName: result.model_name,
+      },
     }))
 
     console.log('✅ Returning generated books:', books.length)

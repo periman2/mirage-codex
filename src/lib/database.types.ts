@@ -778,6 +778,9 @@ export type Database = {
           author_pen_name: string
           author_bio: string
           language_code: string
+          edition_id: string
+          model_id: number
+          model_name: string
         }[]
       }
       save_search_results: {
