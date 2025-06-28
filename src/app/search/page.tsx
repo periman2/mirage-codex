@@ -364,7 +364,7 @@ export default function SearchPage() {
 
       {/* Left Sidebar - Filters */}
       <div className={`
-        w-80 flex-shrink-0 overflow-y-auto
+        w-72 flex-shrink-0 overflow-y-auto overflow-x-hidden
         md:relative md:block md:translate-x-0
         ${isMobileFiltersOpen 
           ? 'fixed inset-y-0 left-0 z-50 translate-x-0 transition-transform duration-300 ease-out md:transition-none' 
@@ -424,7 +424,7 @@ export default function SearchPage() {
             <div className="space-y-2">
               <Label className="text-sm font-medium text-slate-700 dark:text-amber-200">Language</Label>
               <Select value={selectedLanguage} onValueChange={setSelectedLanguage}>
-                <SelectTrigger className="h-9 text-sm bg-white/80 dark:bg-amber-950/20 border-amber-200/50 dark:border-amber-200/30">
+                <SelectTrigger className="h-9 text-sm bg-white/80 dark:bg-amber-950/20 border-amber-200/50 dark:border-amber-200/30 !w-full min-w-0">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -441,7 +441,7 @@ export default function SearchPage() {
             <div className="space-y-2">
               <Label className="text-sm font-medium text-slate-700 dark:text-amber-200">Genre *</Label>
               <Select value={selectedGenre} onValueChange={handleGenreChange}>
-                <SelectTrigger className="h-9 text-sm bg-white/80 dark:bg-amber-950/20 border-amber-200/50 dark:border-amber-200/30">
+                <SelectTrigger className="h-9 text-sm bg-white/80 dark:bg-amber-950/20 border-amber-200/50 dark:border-amber-200/30 !w-full min-w-0">
                   <SelectValue placeholder="Select a genre" />
                 </SelectTrigger>
                 <SelectContent>
@@ -461,13 +461,15 @@ export default function SearchPage() {
                 value={selectedModel?.toString() || ''} 
                 onValueChange={(value) => setSelectedModel(parseInt(value))}
               >
-                <SelectTrigger className="h-9 text-sm bg-white/80 dark:bg-amber-950/20 border-amber-200/50 dark:border-amber-200/30">
+                <SelectTrigger className="h-9 text-sm bg-white/80 dark:bg-amber-950/20 border-amber-200/50 dark:border-amber-200/30 !w-full min-w-0">
                   <SelectValue placeholder="Select a model" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="max-w-80">
                   {models?.map((model) => (
-                    <SelectItem key={model.id} value={model.id.toString()} className="text-sm">
-                      {model.model_domains?.label} - {model.name}
+                    <SelectItem key={model.id} value={model.id.toString()} className="text-sm max-w-80">
+                      <span className="truncate">
+                        {model.model_domains?.label} - {model.name}
+                      </span>
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -644,7 +646,7 @@ export default function SearchPage() {
               </div>
               
               {/* Book Grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
                 {searchMutation.data.books.map((book) => (
                   <BookSearchResultCard key={book.id} book={book} />
                 ))}
