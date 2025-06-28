@@ -3,9 +3,9 @@ import { createSupabaseServerClient, createSupabaseAdminClient } from '@/lib/sup
 import axios from 'axios'
 
 interface RouteParams {
-  params: {
+  params: Promise<{
     id: string
-  }
+  }>
 }
 
 export async function GET(
@@ -13,7 +13,7 @@ export async function GET(
   { params }: RouteParams
 ) {
   try {
-    const bookId = params.id
+    const { id: bookId } = await params
     console.log('📚 Cover request for book ID:', bookId)
 
     // Create Supabase clients

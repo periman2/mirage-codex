@@ -49,7 +49,7 @@ export function BookSearchResultCard({ book }: { book: SearchResultBook }) {
                 <div className="flex flex-col items-center space-y-2">
                   <Sparks className="h-8 w-8 text-amber-600 dark:text-amber-300 animate-spin" />
                   <div className="text-sm text-amber-700 dark:text-amber-200 font-medium">
-                    Generating...
+                    Loading...
                   </div>
                 </div>
               </div>

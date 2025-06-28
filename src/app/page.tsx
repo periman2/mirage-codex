@@ -232,7 +232,7 @@ function ModeCard({ mode, title, subtitle, icon, description, requiresAuth, isPr
             : 'text-slate-600 dark:text-amber-50/90'
         }`}>
           {requiresAuth
-            ? 'Sign in to unlock search. Create unique books by searching them.'
+            ? 'Create unique books by searching them.'
             : description
           }
         </p>
