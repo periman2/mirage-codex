@@ -80,7 +80,7 @@ export async function GET(
       positivePrompt: book.book_cover_prompt,
       width: 512,
       height: 512,  // Square format
-      steps: 8,
+      steps: 4,
       seed: Math.floor(Math.random() * 2147483647),
       CFGScale: 7,
       outputFormat: "JPG",
@@ -89,7 +89,7 @@ export async function GET(
 
     console.log('⏳ Calling Segmind Flux Lightning API...')
     const response = await axios.post(
-      'https://api.segmind.com/v1/juggernaut-lightning-flux',
+      'https://api.segmind.com/v1/fast-flux-schnell',
       payload,
       {
         validateStatus: undefined,

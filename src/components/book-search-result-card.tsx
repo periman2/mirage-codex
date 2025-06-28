@@ -35,7 +35,7 @@ export function BookSearchResultCard({ book }: { book: SearchResultBook }) {
   }
 
   return (
-    <div className="group cursor-pointer transition-all duration-300 hover:scale-105 shadow-md hover:shadow-xl rounded-lg overflow-hidden">
+    <div className="group cursor-pointer transition-all duration-300 hover:scale-[1.02] shadow-lg hover:shadow-xl rounded-xl overflow-hidden">
       {/* Book Cover Container - Square format */}
       <div className="aspect-square w-full relative overflow-hidden shadow-sm">
         {/* Gradient background for light mode */}
@@ -47,8 +47,8 @@ export function BookSearchResultCard({ book }: { book: SearchResultBook }) {
             {imageLoading && (
               <div className="absolute inset-0 bg-gradient-to-br from-amber-100 to-amber-200 dark:from-amber-900 dark:to-amber-800 flex items-center justify-center z-10">
                 <div className="flex flex-col items-center space-y-2">
-                  <Sparks className="h-6 w-6 text-amber-600 dark:text-amber-300 animate-spin" />
-                  <div className="text-xs text-amber-700 dark:text-amber-200 font-medium">
+                  <Sparks className="h-8 w-8 text-amber-600 dark:text-amber-300 animate-spin" />
+                  <div className="text-sm text-amber-700 dark:text-amber-200 font-medium">
                     Generating...
                   </div>
                 </div>
@@ -69,8 +69,8 @@ export function BookSearchResultCard({ book }: { book: SearchResultBook }) {
         )}
         
         {/* Book Title Overlay at top with strong shadow for visibility */}
-        <div className="absolute top-4 left-4 right-4 z-20">
-          <h3 className="text-white font-semibold text-sm leading-tight line-clamp-2 px-3 py-2 rounded-lg bg-black/30 backdrop-blur-sm shadow-lg drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
+        <div className="absolute top-3 left-3 right-3 z-20">
+          <h3 className="text-white font-semibold text-sm leading-tight line-clamp-2 px-3 py-2 rounded-lg bg-black/40 backdrop-blur-sm shadow-lg drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
             {book.title}
           </h3>
         </div>
@@ -79,14 +79,14 @@ export function BookSearchResultCard({ book }: { book: SearchResultBook }) {
       {/* Book Details Below Cover - Not overlapping */}
       <div className="w-full">
         {/* Blurred background for better readability */}
-        <div className="bg-white/90 dark:bg-slate-800/90 backdrop-blur-md rounded-b-lg p-4 shadow-sm border border-white/20 dark:border-slate-700/50 border-t-0">
+        <div className="bg-white/95 dark:bg-slate-800/95 backdrop-blur-md rounded-b-xl p-4 shadow-sm border border-white/20 dark:border-slate-700/50 border-t-0">
           <p className="text-sm font-medium text-slate-700 dark:text-slate-200 line-clamp-1 mb-2">
             by {book.author.penName}
           </p>
-          <p className="text-sm text-slate-600 dark:text-slate-300 line-clamp-2 mb-3 leading-relaxed">
+          <p className="text-xs text-slate-600 dark:text-slate-300 line-clamp-2 mb-3 leading-relaxed">
             {book.summary}
           </p>
-          <div className="flex items-center justify-between text-sm text-slate-500 dark:text-slate-400">
+          <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
             <span className="truncate font-medium">{book.pageCount} pages</span>
           </div>
         </div>
