@@ -180,6 +180,7 @@ export type Database = {
           book_cover_prompt: string | null
           cover_url: string | null
           created_at: string | null
+          genre_id: string
           id: string
           page_count: number
           primary_language_id: number
@@ -191,6 +192,7 @@ export type Database = {
           book_cover_prompt?: string | null
           cover_url?: string | null
           created_at?: string | null
+          genre_id: string
           id?: string
           page_count: number
           primary_language_id: number
@@ -202,6 +204,7 @@ export type Database = {
           book_cover_prompt?: string | null
           cover_url?: string | null
           created_at?: string | null
+          genre_id?: string
           id?: string
           page_count?: number
           primary_language_id?: number
@@ -214,6 +217,13 @@ export type Database = {
             columns: ["author_id"]
             isOneToOne: false
             referencedRelation: "authors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "books_genre_id_fkey"
+            columns: ["genre_id"]
+            isOneToOne: false
+            referencedRelation: "genres"
             referencedColumns: ["id"]
           },
           {
@@ -762,6 +772,26 @@ export type Database = {
           pen_name: string
           style_prompt: string
           bio: string
+        }[]
+      }
+      get_random_book: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          book_id: string
+          book_title: string
+          book_summary: string
+          book_page_count: number
+          book_cover_url: string
+          book_cover_prompt: string
+          author_id: string
+          author_pen_name: string
+          author_bio: string
+          language_code: string
+          genre_slug: string
+          genre_label: string
+          edition_id: string
+          model_id: number
+          model_name: string
         }[]
       }
       get_search_results: {

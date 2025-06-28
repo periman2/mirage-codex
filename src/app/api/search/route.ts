@@ -17,6 +17,9 @@ const SearchRequestSchema = z.object({
   pageNumber: z.number().min(1).default(1),
 });
 
+
+export const maxDuration = 60
+
 /**
  * Select random existing authors who have written in this genre
  */

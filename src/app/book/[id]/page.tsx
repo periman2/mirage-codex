@@ -1,13 +1,16 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams, useSearchParams, useRouter } from 'next/navigation'
 import { useChat } from '@ai-sdk/react'
 import { useAuth } from '@/lib/auth-context'
+import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
-import { ChevronLeft, ChevronRight, Bookmark, Share2, Book, Eye } from 'lucide-react'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { ChevronLeft, ChevronRight, Bookmark, BookmarkMinus, Share2, Book, Eye, List } from 'lucide-react'
 import { toast } from 'sonner'
 import Markdown from 'react-markdown'
 
@@ -43,7 +46,7 @@ export default function BookDetailPage() {
   const router = useRouter()
   const bookId = params?.id as string
   const editionId = searchParams?.get('edition') // Get edition from URL params
-  
+
   const [book, setBook] = useState<BookData | null>(null)
   const [currentPage, setCurrentPage] = useState(() => {
     // Initialize from URL params if available
@@ -55,9 +58,18 @@ export default function BookDetailPage() {
   const [pageLoading, setPageLoading] = useState(false)
   const [isGenerating, setIsGenerating] = useState(false)
   const [isMobileBookInfoOpen, setIsMobileBookInfoOpen] = useState(false)
+  const [existingBookmark, setExistingBookmark] = useState<{ id: number, note: string | null } | null>(null)
+  const [bookmarkNote, setBookmarkNote] = useState('')
+  const [isBookmarkDialogOpen, setIsBookmarkDialogOpen] = useState(false)
+  const [isBookmarksListOpen, setIsBookmarksListOpen] = useState(false)
+  const [allBookmarks, setAllBookmarks] = useState<Array<{ id: number, page_number: number, note: string | null, created_at: string | null }>>([])
+  const [bookmarksLoading, setBookmarksLoading] = useState(false)
+  
+  // Ref to prevent duplicate generation requests
+  const generationInProgress = useRef(false)
 
   // useChat hook for proper streaming
-  const { messages, append, isLoading: chatLoading } = useChat({
+  const { messages, append, status: chatStatus } = useChat({
     api: `/api/book/${bookId}/page/${currentPage}`,
     body: {
       editionId: book?.edition.id
@@ -82,11 +94,13 @@ export default function BookDetailPage() {
         }
       }
       setIsGenerating(false)
+      generationInProgress.current = false
     },
     onError: (error) => {
       console.error('❌ Page generation error:', error)
       toast.error('Failed to generate page content')
       setIsGenerating(false)
+      generationInProgress.current = false
     }
   })
 
@@ -99,26 +113,34 @@ export default function BookDetailPage() {
     if (pageNumber > 1) {
       params.set('page', pageNumber.toString())
     }
-    
+
     const newURL = `/book/${bookId}${params.toString() ? '?' + params.toString() : ''}`
     router.push(newURL, { scroll: false })
   }
 
   // Function to start generation using useChat
   const startGeneration = async () => {
-    if (!book) return
-    
+    if (!book || generationInProgress.current) return
+
     // Check if user is authenticated
     if (!user) {
       toast.error('Please sign in to generate new pages')
       return
     }
-    
+
+    generationInProgress.current = true
     setIsGenerating(true)
-    await append({
-      role: 'user',
-      content: `Generate page ${currentPage} of "${book.title}"`
-    })
+    
+    try {
+      await append({
+        role: 'user',
+        content: `Generate page ${currentPage} of "${book.title}"`
+      })
+    } catch (error) {
+      console.error('Generation failed:', error)
+      setIsGenerating(false)
+      generationInProgress.current = false
+    }
   }
 
   // Load book details
@@ -129,10 +151,10 @@ export default function BookDetailPage() {
       try {
         const response = await fetch(`/api/book/${bookId}`)
         if (!response.ok) throw new Error('Failed to load book')
-        
+
         const bookData = await response.json()
         setBook(bookData)
-        
+
         // Use edition from URL params or default to book's edition
         const finalEditionId = editionId || bookData.edition.id
         if (finalEditionId !== bookData.edition.id) {
@@ -140,7 +162,7 @@ export default function BookDetailPage() {
           // For now, we'll use the book's default edition
           console.log('Using book default edition:', bookData.edition.id)
         }
-        
+
       } catch (error) {
         console.error('Failed to load book:', error)
         toast.error('Failed to load book details')
@@ -159,9 +181,21 @@ export default function BookDetailPage() {
     }
   }, [book?.edition.id, currentPage])
 
+  // Load existing bookmark when user, book, or page changes
+  useEffect(() => {
+    loadExistingBookmark()
+  }, [user?.id, book?.edition.id, currentPage])
+
+  // Load all bookmarks when user and book are available
+  useEffect(() => {
+    if (user && book) {
+      loadAllBookmarks()
+    }
+  }, [user?.id, book?.edition.id])
+
   // Load page content
   useEffect(() => {
-    if (!book || !currentPage) return
+    if (!book?.edition?.id || !currentPage || isGenerating || chatStatus === 'streaming' || generationInProgress.current) return
 
     const loadPageContent = async () => {
       setPageLoading(true)
@@ -185,13 +219,13 @@ export default function BookDetailPage() {
 
         // Page doesn't exist, need to generate it
         setPageLoading(false)
-        
+
         // Check if user is authenticated before attempting generation
         if (!user) {
           setPageContent('')
           return
         }
-        
+
         await startGeneration()
 
       } catch (error) {
@@ -202,7 +236,7 @@ export default function BookDetailPage() {
     }
 
     loadPageContent()
-  }, [book, currentPage])
+  }, [book?.edition?.id, currentPage, user?.id]) // More specific dependencies
 
   const nextPage = () => {
     if (book && currentPage < book.pageCount) {
@@ -219,9 +253,140 @@ export default function BookDetailPage() {
       updatePageURL(newPage)
     }
   }
-  
+
+  // Load existing bookmark for current page
+  const loadExistingBookmark = async () => {
+    if (!user || !book) return
+
+    try {
+      const { data, error } = await supabase
+        .from('bookmarks')
+        .select('id, note')
+        .eq('user_id', user.id)
+        .eq('edition_id', book.edition.id)
+        .eq('page_number', currentPage)
+        .single()
+
+      if (error && error.code !== 'PGRST116') { // PGRST116 is "not found"
+        console.error('Error loading bookmark:', error)
+        return
+      }
+
+      setExistingBookmark(data || null)
+    } catch (error) {
+      console.error('Error checking bookmark:', error)
+    }
+  }
+
+  // Load all bookmarks for current edition
+  const loadAllBookmarks = async () => {
+    if (!user || !book) return
+
+    setBookmarksLoading(true)
+    try {
+      const { data, error } = await supabase
+        .from('bookmarks')
+        .select('id, page_number, note, created_at')
+        .eq('user_id', user.id)
+        .eq('edition_id', book.edition.id)
+        .order('page_number', { ascending: true })
+
+      if (error) {
+        console.error('Error loading bookmarks:', error)
+        toast.error('Failed to load bookmarks')
+        return
+      }
+
+      setAllBookmarks(data || [])
+    } catch (error) {
+      console.error('Error loading bookmarks:', error)
+      toast.error('Failed to load bookmarks')
+    } finally {
+      setBookmarksLoading(false)
+    }
+  }
+
+  // Jump to a bookmarked page
+  const jumpToBookmark = (pageNumber: number) => {
+    setCurrentPage(pageNumber)
+    setIsBookmarksListOpen(false)
+    toast.success(`Jumped to page ${pageNumber}`)
+  }
+
+  // Create a new bookmark
+  const createBookmark = async () => {
+    if (!user || !book) return
+
+    try {
+      const { data, error } = await supabase
+        .from('bookmarks')
+        .insert({
+          user_id: user.id,
+          edition_id: book.edition.id,
+          page_number: currentPage,
+          note: bookmarkNote.trim() || null
+        })
+        .select('id, note')
+        .single()
+
+      if (error) {
+        console.error('Error creating bookmark:', error)
+        toast.error('Failed to save bookmark')
+        return
+      }
+
+      setExistingBookmark(data)
+      setBookmarkNote('')
+      setIsBookmarkDialogOpen(false)
+      toast.success('Bookmark saved!')
+
+      // Refresh bookmarks list
+      loadAllBookmarks()
+    } catch (error) {
+      console.error('Error creating bookmark:', error)
+      toast.error('Failed to save bookmark')
+    }
+  }
+
+  // Delete existing bookmark
+  const deleteBookmark = async () => {
+    if (!existingBookmark) return
+
+    try {
+      const { error } = await supabase
+        .from('bookmarks')
+        .delete()
+        .eq('id', existingBookmark.id)
+
+      if (error) {
+        console.error('Error deleting bookmark:', error)
+        toast.error('Failed to remove bookmark')
+        return
+      }
+
+      setExistingBookmark(null)
+      toast.success('Bookmark removed!')
+
+      // Refresh bookmarks list
+      loadAllBookmarks()
+    } catch (error) {
+      console.error('Error deleting bookmark:', error)
+      toast.error('Failed to remove bookmark')
+    }
+  }
+
   const handleBookmark = async () => {
-    toast.success('Bookmark saved!')
+    if (!user) {
+      toast.error('Please sign in to save bookmarks')
+      return
+    }
+
+    if (existingBookmark) {
+      await deleteBookmark()
+    } else {
+      setBookmarkNote('') // Reset note when opening dialog
+      setIsBookmarkDialogOpen(true)
+    }
   }
 
   const handleShare = async () => {
@@ -229,6 +394,16 @@ export default function BookDetailPage() {
     const url = window.location.href
     await navigator.clipboard.writeText(url)
     toast.success('Page link copied to clipboard!')
+  }
+
+  const handleOpenBookmarksList = () => {
+    if (!user) {
+      toast.error('Please sign in to view bookmarks')
+      return
+    }
+
+    setIsBookmarksListOpen(true)
+    loadAllBookmarks()
   }
 
   if (loading) {
@@ -273,8 +448,8 @@ export default function BookDetailPage() {
         <div className={`
           w-80 h-full bg-white/80 backdrop-blur-sm border-r border-amber-200 shadow-lg
           md:relative md:block md:translate-x-0
-          ${isMobileBookInfoOpen 
-            ? 'fixed inset-y-0 left-0 z-50 translate-x-0 transition-transform duration-300 ease-out md:transition-none' 
+          ${isMobileBookInfoOpen
+            ? 'fixed inset-y-0 left-0 z-50 translate-x-0 transition-transform duration-300 ease-out md:transition-none'
             : 'fixed inset-y-0 left-0 -translate-x-full transition-transform duration-300 ease-out md:transition-none md:translate-x-0'
           }
         `}>
@@ -294,104 +469,205 @@ export default function BookDetailPage() {
             </div>
 
             <div className="space-y-6 p-6">
-            {/* Book Cover */}
-            <div className="aspect-square relative rounded-lg overflow-hidden shadow-lg">
-              <img 
-                src={`/api/book/${book.id}/cover`} 
-                alt={book.title}
-                className="w-full h-full object-cover"
-              />
-            </div>
+              {/* Book Cover */}
+              <div className="aspect-square relative rounded-lg overflow-hidden shadow-lg">
+                <img
+                  src={`/api/book/${book.id}/cover`}
+                  alt={book.title}
+                  className="w-full h-full object-cover"
+                />
+              </div>
 
-            {/* Book Details */}
-            <div className="space-y-4">
-              <h1 className="text-2xl font-bold text-amber-900 leading-tight">
-                {book.title}
-              </h1>
-              <p className="text-base text-amber-700 font-medium">
-                by {book.author.penName}
-              </p>
-              <p className="text-sm text-amber-600">
-                {book.pageCount} pages • {book.language}
-              </p>
-              <p className="text-sm text-amber-600">
-                Generated with {book.edition.modelName}
-              </p>
-            </div>
+              {/* Book Details */}
+              <div className="space-y-4">
+                <h1 className="text-2xl font-bold text-amber-900 leading-tight">
+                  {book.title}
+                </h1>
+                <p className="text-base text-amber-700 font-medium">
+                  by {book.author.penName}
+                </p>
+                <p className="text-sm text-amber-600">
+                  {book.pageCount} pages • {book.language}
+                </p>
+                <p className="text-sm text-amber-600">
+                  Generated with {book.edition.modelName}
+                </p>
+              </div>
 
-            {/* Book Summary */}
-            <Dialog>
-              <div className="bg-amber-50/50 rounded-lg p-4 space-y-3">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-base font-semibold text-amber-900">Summary</h3>
+              {/* Book Summary */}
+              <Dialog>
+                <div className="bg-amber-50/50 rounded-lg p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-base font-semibold text-amber-900">Summary</h3>
+                    <DialogTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 w-6 p-0 text-amber-600 hover:text-amber-800"
+                      >
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                    </DialogTrigger>
+                  </div>
                   <DialogTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-6 w-6 p-0 text-amber-600 hover:text-amber-800"
-                    >
-                      <Eye className="h-4 w-4" />
-                    </Button>
+                    <div className="cursor-pointer">
+                      <p className="text-sm text-amber-800/80 leading-relaxed overflow-hidden" style={{
+                        display: '-webkit-box',
+                        WebkitLineClamp: 3,
+                        WebkitBoxOrient: 'vertical'
+                      }}>
+                        {book.summary}
+                      </p>
+                      <p className="text-xs text-amber-600/70 italic mt-2 hover:text-amber-800 transition-colors">
+                        Click to read full summary...
+                      </p>
+                    </div>
                   </DialogTrigger>
                 </div>
-                <DialogTrigger asChild>
-                  <div className="cursor-pointer">
-                    <p className="text-sm text-amber-800/80 leading-relaxed overflow-hidden" style={{ 
-                      display: '-webkit-box',
-                      WebkitLineClamp: 3,
-                      WebkitBoxOrient: 'vertical'
-                    }}>
+                <DialogContent className="max-w-2xl bg-white/95 backdrop-blur-sm border border-amber-200/50">
+                  <DialogHeader>
+                    <DialogTitle className="text-xl font-bold text-amber-900">
+                      {book.title}
+                    </DialogTitle>
+                  </DialogHeader>
+                  <div className="mt-4">
+                    <h4 className="text-lg font-semibold text-amber-800 mb-3">Summary</h4>
+                    <p className="text-base text-amber-900 leading-relaxed">
                       {book.summary}
                     </p>
-                    <p className="text-xs text-amber-600/70 italic mt-2 hover:text-amber-800 transition-colors">
-                      Click to read full summary...
-                    </p>
                   </div>
-                </DialogTrigger>
+                </DialogContent>
+              </Dialog>
+
+              {/* Page Info */}
+              <div className="text-center">
+                <span className="text-base text-amber-700 font-medium">
+                  Page {currentPage} of {book.pageCount}
+                </span>
               </div>
-              <DialogContent className="max-w-2xl bg-white/95 backdrop-blur-sm border border-amber-200/50">
-                <DialogHeader>
-                  <DialogTitle className="text-xl font-bold text-amber-900">
-                    {book.title}
-                  </DialogTitle>
-                </DialogHeader>
-                <div className="mt-4">
-                  <h4 className="text-lg font-semibold text-amber-800 mb-3">Summary</h4>
-                  <p className="text-base text-amber-900 leading-relaxed">
-                    {book.summary}
-                  </p>
-                </div>
-              </DialogContent>
-            </Dialog>
 
-            {/* Page Info */}
-            <div className="text-center">
-              <span className="text-base text-amber-700 font-medium">
-                Page {currentPage} of {book.pageCount}
-              </span>
-            </div>
+              {/* Action Buttons */}
+              <div className="space-y-3">
+                {/* Bookmark Button */}
+                {user ? (
+                  <Dialog open={isBookmarkDialogOpen} onOpenChange={setIsBookmarkDialogOpen}>
+                    <Button
+                      variant={existingBookmark ? "default" : "outline"}
+                      size="default"
+                      className={`w-full flex items-center gap-2 h-10 ${existingBookmark
+                          ? 'bg-amber-600 hover:bg-amber-700 text-white'
+                          : ''
+                        }`}
+                      onClick={handleBookmark}
+                      title={existingBookmark?.note ? `Note: ${existingBookmark.note}` : undefined}
+                    >
+                      {existingBookmark ? (
+                        <>
+                          <BookmarkMinus className="h-4 w-4" />
+                          Remove Bookmark
+                          {existingBookmark.note && (
+                            <span className="text-xs bg-amber-200 text-amber-800 px-1 py-0.5 rounded ml-1">
+                              📝
+                            </span>
+                          )}
+                        </>
+                      ) : (
+                        <>
+                          <Bookmark className="h-4 w-4" />
+                          Add Bookmark
+                        </>
+                      )}
+                    </Button>
 
-            {/* Action Buttons */}
-            <div className="space-y-3">
-              <Button 
-                variant="outline" 
-                size="default" 
-                className="w-full flex items-center gap-2 h-10"
-                onClick={handleBookmark}
-              >
-                <Bookmark className="h-4 w-4" />
-                Bookmark
-              </Button>
-              <Button 
-                variant="outline" 
-                size="default" 
-                className="w-full flex items-center gap-2 h-10"
-                onClick={handleShare}
-              >
-                <Share2 className="h-4 w-4" />
-                Share Page
-              </Button>
-            </div>
+                    <DialogContent className="max-w-md bg-white/95 backdrop-blur-sm border border-amber-200/50">
+                      <DialogHeader>
+                        <DialogTitle className="text-lg font-bold text-amber-900">
+                          Add Bookmark
+                        </DialogTitle>
+                      </DialogHeader>
+                      <div className="space-y-4 mt-4">
+                        <div>
+                          <p className="text-sm text-amber-800 mb-3">
+                            Bookmarking page {currentPage} of "{book?.title}"
+                          </p>
+                          <Label htmlFor="bookmark-note" className="text-sm font-medium text-amber-900">
+                            Note (optional)
+                          </Label>
+                          <Input
+                            id="bookmark-note"
+                            value={bookmarkNote}
+                            onChange={(e) => setBookmarkNote(e.target.value)}
+                            placeholder="Add a note about this page..."
+                            className="mt-1 bg-white/80 border-amber-200/50"
+                            maxLength={500}
+                          />
+                          <p className="text-xs text-amber-600/70 mt-1">
+                            {bookmarkNote.length}/500 characters
+                          </p>
+                        </div>
+                        <div className="flex space-x-2 pt-2">
+                          <Button
+                            onClick={() => setIsBookmarkDialogOpen(false)}
+                            variant="outline"
+                            className="flex-1"
+                          >
+                            Cancel
+                          </Button>
+                          <Button
+                            onClick={createBookmark}
+                            className="flex-1 bg-amber-600 hover:bg-amber-700 text-white"
+                          >
+                            Save Bookmark
+                          </Button>
+                        </div>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+                ) : (
+                  <Button
+                    variant="outline"
+                    size="default"
+                    className="w-full flex items-center gap-2 h-10 opacity-50 cursor-not-allowed"
+                    disabled
+                  >
+                    <Bookmark className="h-4 w-4" />
+                    Sign in to Bookmark
+                  </Button>
+                )}
+
+
+                {user ? (
+                  <Button
+                    variant="outline"
+                    size="default"
+                    className="w-full flex items-center gap-2 h-10"
+                    onClick={handleOpenBookmarksList}
+                  >
+                    <List className="h-4 w-4" />
+                    View Bookmarks ({allBookmarks.length})
+                  </Button>
+                ) : (
+                  <Button
+                    variant="outline"
+                    size="default"
+                    className="w-full flex items-center gap-2 h-10 opacity-50 cursor-not-allowed"
+                    disabled
+                  >
+                    <List className="h-4 w-4" />
+                    Sign in for Bookmarks
+                  </Button>
+                )}
+
+                <Button
+                  variant="outline"
+                  size="default"
+                  className="w-full flex items-center gap-2 h-10"
+                  onClick={handleShare}
+                >
+                  <Share2 className="h-4 w-4" />
+                  Share Page
+                </Button>
+              </div>
             </div>
           </div>
         </div>
@@ -403,9 +679,19 @@ export default function BookDetailPage() {
               {/* Page Header */}
               <div className="px-4 py-3 md:px-6 md:py-4 border-b border-amber-200/30 bg-white/50">
                 <div className="flex items-center justify-between">
-                  <h2 className="text-sm md:text-lg font-semibold text-amber-900">
-                    Page {currentPage} of {book?.pageCount}
-                  </h2>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-sm md:text-lg font-semibold text-amber-900">
+                      Page {currentPage} of {book?.pageCount}
+                    </h2>
+                    {existingBookmark && (
+                      <span
+                        className="text-amber-600 hover:text-amber-800 transition-colors"
+                        title={existingBookmark.note ? `Bookmarked: ${existingBookmark.note}` : 'Bookmarked'}
+                      >
+                        <Bookmark className="h-4 w-4 fill-current" />
+                      </span>
+                    )}
+                  </div>
                   <div className="flex space-x-2 md:space-x-3">
                     <Button
                       onClick={prevPage}
@@ -449,7 +735,7 @@ export default function BookDetailPage() {
                         <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-amber-600"></div>
                         <span className="text-sm">Generating page content...</span>
                       </div>
-                      
+
                       {/* Show streaming content with markdown */}
                       <div className="prose prose-amber max-w-none">
                         <Markdown
@@ -494,8 +780,8 @@ export default function BookDetailPage() {
                           <>
                             <p className="text-amber-600">This page hasn't been generated yet.</p>
                             <p className="text-amber-500 text-sm">Please sign in to generate new pages.</p>
-                            <Button 
-                              onClick={() => window.location.href = '/'} 
+                            <Button
+                              onClick={() => window.location.href = '/'}
                               className="bg-amber-600 hover:bg-amber-700 text-white"
                             >
                               Sign In
@@ -515,6 +801,80 @@ export default function BookDetailPage() {
 
         </div>
       </div>
+
+      {/* Bookmarks List Modal */}
+      <Dialog open={isBookmarksListOpen} onOpenChange={setIsBookmarksListOpen}>
+        <DialogContent className="max-w-md max-h-[80vh] bg-white/95 backdrop-blur-sm border border-amber-200/50">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-bold text-amber-900 flex items-center gap-2">
+              <List className="h-5 w-5" />
+              Bookmarks for "{book?.title}"
+            </DialogTitle>
+          </DialogHeader>
+          <div className="mt-4 space-y-2 max-h-96 overflow-y-auto">
+            {bookmarksLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-amber-600"></div>
+              </div>
+            ) : allBookmarks.length === 0 ? (
+              <div className="text-center py-8 text-amber-600">
+                <Bookmark className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                <p className="text-sm">No bookmarks yet.</p>
+                <p className="text-xs text-amber-500 mt-1">Bookmark pages as you read to quickly return to them.</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {allBookmarks.map((bookmark) => (
+                  <div
+                    key={bookmark.id}
+                    className={`
+                      p-3 rounded-lg border cursor-pointer transition-all duration-200 hover:shadow-md
+                      ${bookmark.page_number === currentPage
+                        ? 'bg-amber-100 border-amber-300 shadow-sm'
+                        : 'bg-white/80 border-amber-200/50 hover:bg-amber-50'
+                      }
+                    `}
+                    onClick={() => jumpToBookmark(bookmark.page_number)}
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-medium text-amber-900">
+                            Page {bookmark.page_number}
+                          </span>
+                          {bookmark.page_number === currentPage && (
+                            <span className="text-xs bg-amber-600 text-white px-1.5 py-0.5 rounded">
+                              Current
+                            </span>
+                          )}
+                        </div>
+                        {bookmark.note && (
+                          <p className="text-sm text-amber-700 line-clamp-2">
+                            {bookmark.note}
+                          </p>
+                        )}
+                        <p className="text-xs text-amber-500 mt-1">
+                          {bookmark.created_at ? new Date(bookmark.created_at).toLocaleDateString() : 'Unknown date'}
+                        </p>
+                      </div>
+                      <ChevronRight className="h-4 w-4 text-amber-400 flex-shrink-0 ml-2" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          <div className="flex justify-end pt-4 border-t border-amber-200/30">
+            <Button
+              onClick={() => setIsBookmarksListOpen(false)}
+              variant="outline"
+              className="border-amber-200/50"
+            >
+              Close
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 } 

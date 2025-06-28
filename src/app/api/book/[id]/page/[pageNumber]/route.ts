@@ -11,7 +11,7 @@ interface RouteParams {
 }
 
 // Allow streaming responses up to 30 seconds
-export const maxDuration = 30
+export const maxDuration = 60
 
 // GET endpoint to check if page exists
 export async function GET(

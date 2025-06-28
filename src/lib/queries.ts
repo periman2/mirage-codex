@@ -10,6 +10,10 @@ export const queryKeys = {
     list: (filters: any) => [...queryKeys.books.lists(), filters] as const,
     details: () => [...queryKeys.books.all, 'detail'] as const,
     detail: (id: string) => [...queryKeys.books.details(), id] as const,
+    userSearched: (userId: string, limit: number) => [...queryKeys.books.all, 'userSearched', userId, limit] as const,
+    latest: (limit: number) => [...queryKeys.books.all, 'latest', limit] as const,
+    byGenre: (genreSlug: string, limit: number) => [...queryKeys.books.all, 'byGenre', genreSlug, limit] as const,
+    random: () => [...queryKeys.books.all, 'random'] as const,
   },
   languages: {
     all: ['languages'] as const,
@@ -171,7 +175,7 @@ export function useTagsByGenre(genreId?: string) {
   })
 }
 
-// Books with infinite scrolling
+// Books with infinite scrolling - Updated to include genre_id
 export function useBooks(filters: {
   language_id?: number
   genre_id?: string
@@ -199,6 +203,11 @@ export function useBooks(filters: {
             id,
             code,
             label
+          ),
+          genres (
+            id,
+            slug,
+            label
           )
         `)
         .range(from, to)
@@ -207,6 +216,10 @@ export function useBooks(filters: {
       // Apply filters
       if (filters.language_id) {
         query = query.eq('primary_language_id', filters.language_id)
+      }
+      
+      if (filters.genre_id) {
+        query = query.eq('genre_id', filters.genre_id)
       }
       
       if (filters.search) {
@@ -226,7 +239,190 @@ export function useBooks(filters: {
   })
 }
 
-// Single book details
+// User's searched books (books from their search results) - Fixed query structure
+export function useUserSearchedBooks(userId: string, limit: number = 10) {
+  const supabase = createSupabaseBrowserClient()
+  
+  return useInfiniteQuery({
+    queryKey: queryKeys.books.userSearched(userId, limit),
+    queryFn: async ({ pageParam = 0 }) => {
+      const from = pageParam * limit
+      const to = from + limit - 1
+      
+      // First get the search IDs for this user, ordered by creation date
+      const { data: searchIds, error: searchError } = await supabase
+        .from('searches')
+        .select('id')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .range(from, to)
+      
+      if (searchError) throw searchError
+      if (!searchIds?.length) return []
+      
+      // Then get books from those searches
+      const { data: searchBooks, error: booksError } = await supabase
+        .from('search_books')
+        .select(`
+          books (
+            *,
+            authors (
+              id,
+              pen_name,
+              bio
+            ),
+            languages (
+              id,
+              code,
+              label
+            ),
+            genres (
+              id,
+              slug,
+              label
+            ),
+            editions (
+              id,
+              model_id,
+              language_id,
+              models (
+                id,
+                name
+              )
+            )
+          )
+        `)
+        .in('search_id', searchIds.map(s => s.id))
+        .order('rank', { ascending: true })
+      
+      if (booksError) throw booksError
+      
+      // Flatten and deduplicate books
+      const books = searchBooks?.map(item => item.books).filter(Boolean) || []
+      const uniqueBooks = books.filter((book, index, self) => 
+        index === self.findIndex(b => b?.id === book?.id)
+      )
+      
+      return uniqueBooks
+    },
+    getNextPageParam: (lastPage, allPages) => {
+      return lastPage.length === limit ? allPages.length : undefined
+    },
+    initialPageParam: 0,
+    enabled: !!userId,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  })
+}
+
+// Latest releases (most recently created books) - Converted to infinite query
+export function useLatestBooks(limit: number = 10) {
+  const supabase = createSupabaseBrowserClient()
+  
+  return useInfiniteQuery({
+    queryKey: queryKeys.books.latest(limit),
+    queryFn: async ({ pageParam = 0 }) => {
+      const from = pageParam * limit
+      const to = from + limit - 1
+      
+      const { data, error } = await supabase
+        .from('books')
+        .select(`
+          *,
+          authors (
+            id,
+            pen_name,
+            bio
+          ),
+          languages (
+            id,
+            code,
+            label
+          ),
+          genres (
+            id,
+            slug,
+            label
+          ),
+          editions (
+            id,
+            model_id,
+            language_id,
+            models (
+              id,
+              name
+            )
+          )
+        `)
+        .order('created_at', { ascending: false })
+        .range(from, to)
+      
+      if (error) throw error
+      return data || []
+    },
+    getNextPageParam: (lastPage, allPages) => {
+      return lastPage.length === limit ? allPages.length : undefined
+    },
+    initialPageParam: 0,
+    staleTime: 2 * 60 * 1000, // 2 minutes
+  })
+}
+
+// Books by specific genre - Converted to infinite query
+export function useBooksByGenre(genreSlug: string, limit: number = 10) {
+  const supabase = createSupabaseBrowserClient()
+  
+  return useInfiniteQuery({
+    queryKey: queryKeys.books.byGenre(genreSlug, limit),
+    queryFn: async ({ pageParam = 0 }) => {
+      const from = pageParam * limit
+      const to = from + limit - 1
+      
+      const { data, error } = await supabase
+        .from('books')
+        .select(`
+          *,
+          authors (
+            id,
+            pen_name,
+            bio
+          ),
+          languages (
+            id,
+            code,
+            label
+          ),
+          genres!inner (
+            id,
+            slug,
+            label
+          ),
+          editions (
+            id,
+            model_id,
+            language_id,
+            models (
+              id,
+              name
+            )
+          )
+        `)
+        .eq('genres.slug', genreSlug)
+        .order('created_at', { ascending: false })
+        .range(from, to)
+      
+      if (error) throw error
+      return data || []
+    },
+    getNextPageParam: (lastPage, allPages) => {
+      return lastPage.length === limit ? allPages.length : undefined
+    },
+    initialPageParam: 0,
+    enabled: !!genreSlug,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  })
+}
+
+// Single book details - Updated to include genre
 export function useBook(bookId: string) {
   const supabase = createSupabaseBrowserClient()
   
@@ -246,6 +442,11 @@ export function useBook(bookId: string) {
           languages (
             id,
             code,
+            label
+          ),
+          genres (
+            id,
+            slug,
             label
           ),
           editions (
@@ -318,5 +519,54 @@ export function useUserSearches(userId?: string) {
     },
     enabled: !!userId,
     staleTime: 5 * 60 * 1000, // 5 minutes
+  })
+}
+
+// Random book
+export function useRandomBook() {
+  const supabase = createSupabaseBrowserClient()
+  
+  return useQuery({
+    queryKey: queryKeys.books.random(),
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('get_random_book')
+      
+      if (error) throw error
+      
+      if (!data || data.length === 0) {
+        return null
+      }
+      
+      const book = data[0]
+      
+      // Transform the RPC result to match our SearchResultBook type
+      return {
+        id: book.book_id,
+        title: book.book_title,
+        summary: book.book_summary,
+        pageCount: book.book_page_count,
+        coverUrl: book.book_cover_url,
+        bookCoverPrompt: book.book_cover_prompt,
+        author: {
+          id: book.author_id,
+          penName: book.author_pen_name,
+          bio: book.author_bio
+        },
+        language: book.language_code,
+        genre: {
+          slug: book.genre_slug,
+          label: book.genre_label
+        },
+        sections: [], // Random book doesn't need sections
+        edition: {
+          id: book.edition_id,
+          modelId: book.model_id,
+          modelName: book.model_name
+        }
+      }
+    },
+    enabled: false, // Only fetch when explicitly triggered
+    staleTime: 0, // Always fresh random results
+    gcTime: 0, // Don't cache random results
   })
 } 

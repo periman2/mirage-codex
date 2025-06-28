@@ -126,3 +126,12 @@
     background: radial-gradient(circle, var(--tw-gradient-stops));
   }
 }
+
+/* Hide scrollbar for horizontal book sections */
+.scrollbar-hide {
+  -ms-overflow-style: none;  /* Internet Explorer 10+ */
+  scrollbar-width: none;  /* Firefox */
+}
+.scrollbar-hide::-webkit-scrollbar { 
+  display: none;  /* Safari and Chrome */
+}

@@ -3,194 +3,273 @@
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Book, User, Clock } from 'iconoir-react'
-import { useState } from 'react'
+import { Book, User, Clock, ArrowLeft, ArrowRight } from 'iconoir-react'
+import { useState, useRef, useEffect, useCallback } from 'react'
+import { BookSearchResultCard } from './book-search-result-card'
 
-// Mock book data - in real app this would come from the database
-const mockBooks = [
-  {
-    id: '1',
-    title: 'The Whispered Geometries',
-    author: 'Lysander Vex',
-    summary: 'A mathematician discovers that reality itself follows impossible equations, leading to a journey through dimensions where logic bends.',
-    pageCount: 342,
-    coverUrl: null,
-    language: 'English',
-    genre: 'Science Fiction',
-    tags: ['philosophical', 'mathematical', 'mind-bending'],
-    createdAt: '2024-01-15',
-  },
-  {
-    id: '2',
-    title: 'Shadows of the Crimson Moon',
-    author: 'Evangeline Thorne',
-    summary: 'In a world where the moon bleeds light, a young sorceress must master her forbidden magic to save her dying realm.',
-    pageCount: 428,
-    coverUrl: null,
-    language: 'English',
-    genre: 'Fantasy',
-    tags: ['dark', 'magical', 'epic'],
-    createdAt: '2024-01-12',
-  },
-  {
-    id: '3',
-    title: 'The Last Bookkeeper',
-    author: 'Marcus Silverton',
-    summary: 'After all digital records vanish, one librarian becomes humanity\'s sole keeper of written knowledge in a post-digital wasteland.',
-    pageCount: 287,
-    coverUrl: null,
-    language: 'English',
-    genre: 'Dystopian Fiction',
-    tags: ['post-apocalyptic', 'philosophical', 'literary'],
-    createdAt: '2024-01-10',
-  },
-  {
-    id: '4',
-    title: 'Καθρέφτες της Ψυχής',
-    author: 'Αριάδνη Κάλλιστος',
-    summary: 'Μια ψυχοπομπός ανακαλύπτει ότι οι καθρέφτες δεν αντανακλούν εικόνες αλλά αναμνήσεις από παράλληλες ζωές.',
-    pageCount: 195,
-    coverUrl: null,
-    language: 'Greek',
-    genre: 'Magical Realism',
-    tags: ['philosophical', 'mystical', 'introspective'],
-    createdAt: '2024-01-08',
-  },
-  {
-    id: '5',
-    title: 'L\'Écho des Horloges Perdues',
-    author: 'Céleste Dubois',
-    summary: 'Dans un Paris où le temps s\'est fracturé, une horlogère doit réparer les mécanismes temporels avant que la réalité ne s\'effondre.',
-    pageCount: 356,
-    coverUrl: null,
-    language: 'French',
-    genre: 'Steampunk',
-    tags: ['temporal', 'mechanical', 'romantic'],
-    createdAt: '2024-01-05',
-  },
-  {
-    id: '6',
-    title: 'El Jardín de Memorias Rotas',
-    author: 'Isabella Montemayor',
-    summary: 'Una neurocientífica descubre que los recuerdos perdidos no desaparecen, sino que crecen como flores en un jardín interdimensional.',
-    pageCount: 298,
-    coverUrl: null,
-    language: 'Spanish',
-    genre: 'Science Fiction',
-    tags: ['memory', 'psychological', 'lyrical'],
-    createdAt: '2024-01-03',
-  },
-  {
-    id: '7',
-    title: 'The Cartographer of Dreams',
-    author: 'Ophelia Nightingale',
-    summary: 'A dream researcher learns to map the geography of sleeping minds, only to discover nightmares have their own twisted logic.',
-    pageCount: 412,
-    coverUrl: null,
-    language: 'English',
-    genre: 'Horror',
-    tags: ['psychological', 'surreal', 'dark'],
-    createdAt: '2024-01-01',
-  },
-  {
-    id: '8',
-    title: 'Quantum Hearts',
-    author: 'Dr. Amara Chen',
-    summary: 'Two physicists fall in love across parallel universes, communicating only through quantum entanglement experiments.',
-    pageCount: 267,
-    coverUrl: null,
-    language: 'English',
-    genre: 'Romance',
-    tags: ['scientific', 'romantic', 'parallel-worlds'],
-    createdAt: '2023-12-28',
-  },
-]
 
-function generateCoverGradient(bookId: string) {
-  // Generate a consistent gradient based on book ID
-  const gradients = [
-    'from-purple-400 to-pink-400',
-    'from-blue-400 to-purple-400',
-    'from-green-400 to-blue-400',
-    'from-yellow-400 to-orange-400',
-    'from-red-400 to-pink-400',
-    'from-indigo-400 to-purple-400',
-    'from-teal-400 to-green-400',
-    'from-orange-400 to-red-400',
-  ]
-  
-  const index = parseInt(bookId, 10) % gradients.length
-  return gradients[index]
+// Types for books with all necessary data
+type BookWithRelations = {
+  id: string
+  title: string
+  summary: string
+  page_count: number
+  cover_url: string | null
+  book_cover_prompt: string | null
+  created_at: string | null
+  authors: {
+    id: string
+    pen_name: string
+    bio: string | null
+  }
+  languages: {
+    id: number
+    code: string
+    label: string
+  }
+  genres: {
+    id: string
+    slug: string
+    label: string
+  }
+  editions: Array<{
+    id: string
+    model_id: number
+    language_id: number
+    models: {
+      id: number
+      name: string
+    }
+  }>
 }
 
-export function BookGrid() {
-  const [books] = useState(mockBooks)
+// Transform database book to search result card format
+const transformBookToSearchResult = (book: BookWithRelations) => {
+  const defaultEdition = book.editions?.[0]
+  
+  return {
+    id: book.id,
+    title: book.title,
+    summary: book.summary,
+    pageCount: book.page_count,
+    coverUrl: book.cover_url,
+    bookCoverPrompt: book.book_cover_prompt,
+    author: {
+      id: book.authors.id,
+      penName: book.authors.pen_name,
+      bio: book.authors.bio
+    },
+    language: book.languages.label,
+    sections: [], // We don't need sections for the browse cards
+    edition: {
+      id: defaultEdition?.id || '',
+      modelId: defaultEdition?.model_id || 0,
+      modelName: defaultEdition?.models?.name || 'Unknown'
+    }
+  }
+}
+
+// Horizontal scrollable book section for Netflix-style browsing with infinite loading
+export function BookSection({ 
+  title, 
+  queryResult
+}: { 
+  title: string
+  queryResult: any // Using any for now to fix typing issues
+}) {
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
+  const loadTriggerRef = useRef<HTMLDivElement>(null)
+  const [canScrollLeft, setCanScrollLeft] = useState(false)
+  const [canScrollRight, setCanScrollRight] = useState(true)
+
+  const { data, isLoading, hasNextPage, fetchNextPage, isFetchingNextPage } = queryResult
+  
+  // Flatten all pages into a single array
+  const allBooks = (data?.pages?.flat() || []) as BookWithRelations[]
+
+  const checkScrollButtons = useCallback(() => {
+    if (scrollContainerRef.current) {
+      const { scrollLeft, scrollWidth, clientWidth } = scrollContainerRef.current
+      setCanScrollLeft(scrollLeft > 0)
+      setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 10) // 10px buffer
+    }
+  }, [])
+
+  const scroll = (direction: 'left' | 'right') => {
+    if (scrollContainerRef.current) {
+      const scrollAmount = scrollContainerRef.current.clientWidth * 0.8
+      const newScrollLeft = scrollContainerRef.current.scrollLeft + 
+        (direction === 'left' ? -scrollAmount : scrollAmount)
+      
+      scrollContainerRef.current.scrollTo({
+        left: newScrollLeft,
+        behavior: 'smooth'
+      })
+      
+      // Update buttons after scroll
+      setTimeout(checkScrollButtons, 300)
+    }
+  }
+
+  // Intersection observer for infinite loading
+  useEffect(() => {
+    if (!loadTriggerRef.current || !hasNextPage || isFetchingNextPage) return
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          fetchNextPage()
+        }
+      },
+      { 
+        threshold: 0.1,
+        rootMargin: '100px' // Load when 100px away from being visible
+      }
+    )
+
+    observer.observe(loadTriggerRef.current)
+    return () => observer.disconnect()
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage])
+
+  // Update scroll buttons when books change
+  useEffect(() => {
+    checkScrollButtons()
+  }, [allBooks.length, checkScrollButtons])
+
+  // Loading skeleton
+  if (isLoading) {
+    return (
+      <div className="space-y-4">
+        <div className="h-7 bg-amber-200/30 rounded w-48 animate-pulse" />
+        <div className="flex space-x-4 overflow-hidden">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="flex-none w-48">
+              <div className="aspect-square bg-amber-200/30 rounded-xl animate-pulse mb-3" />
+              <div className="space-y-2">
+                <div className="h-4 bg-amber-200/30 rounded animate-pulse" />
+                <div className="h-3 bg-amber-200/30 rounded w-2/3 animate-pulse" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
+  // Empty state
+  if (!allBooks.length) {
+    return (
+      <div className="space-y-4">
+        <h2 className="text-xl font-bold text-amber-900">{title}</h2>
+        <div className="flex items-center justify-center h-32 text-amber-600 text-sm">
+          No books available in this section yet.
+        </div>
+      </div>
+    )
+  }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-      {books.map((book) => (
-        <Card key={book.id} className="group hover:shadow-lg transition-all duration-300 hover:-translate-y-1 cursor-pointer">
-          {/* Book Cover */}
-          <div className={`aspect-[3/4] bg-gradient-to-br ${generateCoverGradient(book.id)} rounded-t-lg flex items-center justify-center relative overflow-hidden`}>
-            <div className="absolute inset-0 bg-black/10 group-hover:bg-black/20 transition-colors" />
-            <div className="text-center p-4 relative z-10">
-              <Book className="w-12 h-12 text-white/80 mx-auto mb-2" />
-              <h3 className="text-white font-bold text-sm leading-tight line-clamp-3">
-                {book.title}
-              </h3>
-            </div>
-          </div>
+    <div className="space-y-4 group">
+      {/* Section Title */}
+      <h2 className="text-xl font-bold text-amber-900">{title}</h2>
+      
+      {/* Scrollable Books Container */}
+      <div className="relative">
+        {/* Left Scroll Button */}
+        {canScrollLeft && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="absolute left-2 top-1/2 -translate-y-1/2 z-10 h-12 w-12 p-0 bg-white/95 backdrop-blur-sm border-amber-200/50 shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+            onClick={() => scroll('left')}
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+        )}
 
-          {/* Book Info */}
-          <CardContent className="p-4">
-            <div className="space-y-3">
-              <div>
-                <h4 className="font-semibold text-slate-900 dark:text-slate-100 line-clamp-2">
-                  {book.title}
-                </h4>
-                <div className="flex items-center gap-1 text-sm text-slate-600 dark:text-slate-400 mt-1">
-                  <User className="w-3 h-3" />
-                  <span>{book.author}</span>
+        {/* Right Scroll Button */}
+        {canScrollRight && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="absolute right-2 top-1/2 -translate-y-1/2 z-10 h-12 w-12 p-0 bg-white/95 backdrop-blur-sm border-amber-200/50 shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+            onClick={() => scroll('right')}
+          >
+            <ArrowRight className="h-5 w-5" />
+          </Button>
+        )}
+
+        {/* Books Scroll Container */}
+        <div
+          ref={scrollContainerRef}
+          className="flex space-x-4 overflow-x-auto scrollbar-hide pb-2"
+          style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+          onScroll={checkScrollButtons}
+        >
+          {allBooks.map((book: BookWithRelations, index: number) => (
+            <div key={`${book.id}-${index}`} className="flex-none w-48">
+              <BookSearchResultCard book={transformBookToSearchResult(book)} />
+            </div>
+          ))}
+          
+          {/* Infinite loading trigger */}
+          {hasNextPage && (
+            <div ref={loadTriggerRef} className="flex-none w-48 flex items-center justify-center">
+              {isFetchingNextPage ? (
+                <div className="aspect-square bg-amber-200/30 rounded-xl animate-pulse flex items-center justify-center">
+                  <div className="w-8 h-8 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
                 </div>
-              </div>
-
-              <p className="text-sm text-slate-600 dark:text-slate-400 line-clamp-3">
-                {book.summary}
-              </p>
-
-              <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-500">
-                <Clock className="w-3 h-3" />
-                <span>{book.pageCount} pages</span>
-                <span>•</span>
-                <span>{book.language}</span>
-              </div>
-
-              <div className="flex flex-wrap gap-1">
-                <Badge variant="secondary" className="text-xs">
-                  {book.genre}
-                </Badge>
-                {book.tags.slice(0, 2).map(tag => (
-                  <Badge key={tag} variant="outline" className="text-xs">
-                    {tag}
-                  </Badge>
-                ))}
-                {book.tags.length > 2 && (
-                  <Badge variant="outline" className="text-xs">
-                    +{book.tags.length - 2}
-                  </Badge>
-                )}
-              </div>
-
-              <Button 
-                variant="outline" 
-                size="sm" 
-                className="w-full mt-3 group-hover:bg-slate-50 dark:group-hover:bg-slate-800"
-              >
-                Read Book
-              </Button>
+              ) : (
+                <div className="aspect-square border-2 border-dashed border-amber-300 rounded-xl flex items-center justify-center opacity-50">
+                  <Book className="h-8 w-8 text-amber-400" />
+                </div>
+              )}
             </div>
-          </CardContent>
-        </Card>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Traditional grid for full browsing (keeping existing functionality but removing mocks)
+export function BookGrid({ books, loading = false }: { books?: BookWithRelations[], loading?: boolean }) {
+  if (loading) {
+    return (
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+        {Array.from({ length: 12 }).map((_, i) => (
+          <Card key={i} className="animate-pulse">
+            <div className="aspect-square bg-amber-200/30 rounded-t-xl" />
+            <CardContent className="p-4">
+              <div className="h-4 bg-amber-200/30 rounded mb-2" />
+              <div className="h-3 bg-amber-200/30 rounded mb-2" />
+              <div className="h-3 bg-amber-200/30 rounded w-2/3" />
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    )
+  }
+
+  if (!books?.length) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 text-amber-600">
+        <Book className="h-16 w-16 mb-4 opacity-50" />
+        <h3 className="text-lg font-semibold mb-2">No books found</h3>
+        <p className="text-sm text-center max-w-md">
+          Try adjusting your filters or search terms to discover more books.
+        </p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+      {books.map((book) => (
+        <BookSearchResultCard 
+          key={book.id} 
+          book={transformBookToSearchResult(book)} 
+        />
       ))}
     </div>
   )
