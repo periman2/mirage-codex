@@ -6,22 +6,28 @@ export interface SearchParams {
   languageCode: string
   genreSlug: string
   tagSlugs: string[]
-  modelName: string
+  modelId: number
+  pageNumber: number
+  pageSize: number
   extraJson?: any
 }
 
 /**
  * Creates a deterministic hash from search parameters
  * Same parameters always produce the same hash
+ * Note: modelName and languageCode are excluded from hash as they represent
+ * different editions/translations of the same conceptual books
+ * pageNumber and pageSize are included for pagination caching
  */
 export function createSearchHash(params: SearchParams): string {
   // Normalize parameters for consistent hashing
+  // Include pagination parameters for per-page caching
   const normalized = {
     freeText: params.freeText?.trim() || null,
-    languageCode: params.languageCode,
     genreSlug: params.genreSlug,
     tagSlugs: params.tagSlugs.sort(), // Sort tags for consistency
-    modelName: params.modelName,
+    pageNumber: params.pageNumber,
+    pageSize: params.pageSize,
     extraJson: params.extraJson || null
   }
 
@@ -41,7 +47,7 @@ export function createSearchHash(params: SearchParams): string {
  * Validates search parameters
  */
 export function validateSearchParams(params: Partial<SearchParams>): SearchParams | null {
-  if (!params.languageCode || !params.genreSlug || !params.modelName) {
+  if (!params.languageCode || !params.genreSlug || !params.modelId) {
     return null
   }
 
@@ -50,7 +56,9 @@ export function validateSearchParams(params: Partial<SearchParams>): SearchParam
     languageCode: params.languageCode,
     genreSlug: params.genreSlug,
     tagSlugs: params.tagSlugs || [],
-    modelName: params.modelName,
+    modelId: params.modelId,
+    pageNumber: params.pageNumber || 1,
+    pageSize: params.pageSize || 3, // Default to PAGE_SIZE
     extraJson: params.extraJson || null
   }
 } 

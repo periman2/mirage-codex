@@ -4,15 +4,23 @@ import { anthropic } from '@ai-sdk/anthropic'
 import { google } from '@ai-sdk/google'
 import { z } from 'zod'
 
-// Model configurations
-export const modelConfigs = {
-  'gpt-4o': openai('gpt-4o'),
-  'gpt-4.1': openai('gpt-4.1'),
-  'gpt-4.1-mini': openai('gpt-4.1-mini'),
-  'claude-4-sonnet': anthropic('claude-4-sonnet-20250514'),
-  'gemini-2.5-pro': google('gemini-2.5-pro'),
-  'gemini-2.5-flash': google('gemini-2.5-flash'),
-  'gemini-2.5-flash-lite': google('gemini-2.5-flash-lite-preview-06-17'),
+// Constants
+export const PAGE_SIZE = 3 // Number of books generated per search
+
+/**
+ * Create a model configuration dynamically based on domain and model name
+ */
+function createModel(domain: string, modelName: string) {
+  switch (domain) {
+    case 'openai':
+      return openai(modelName)
+    case 'anthropic':
+      return anthropic(modelName)
+    case 'google':
+      return google(modelName)
+    default:
+      throw new Error(`Unsupported model domain: ${domain}`)
+  }
 }
 
 // Schemas for structured generation
@@ -20,6 +28,10 @@ export const AuthorSchema = z.object({
   penName: z.string().describe('The author\'s pen name'),
   stylePrompt: z.string().describe('A brief description of the author\'s writing style'),
   bio: z.string().describe('A fictional biography of the author (2-3 sentences)'),
+})
+
+export const AuthorListSchema = z.object({
+  authors: z.array(AuthorSchema).describe('A list of fictional authors for the specified genre'),
 })
 
 export const SectionSchema = z.object({
@@ -32,14 +44,14 @@ export const SectionSchema = z.object({
 export const BookSchema = z.object({
   title: z.string().describe('The book title'),
   summary: z.string().describe('A compelling book summary (2-3 sentences)'),
-  pageCount: z.number().min(5).max(150).describe('Realistic page count for this type of book'),
-  author: AuthorSchema.optional().describe('Author information - only include if creating a new author'),
-  authorPenName: z.string().optional().describe('Pen name of existing author from database - only include if using existing author'),
-  sections: z.array(SectionSchema).min(3).max(20).describe('Book sections with page ranges and summaries'),
+  pageCount: z.number().describe('Realistic page count for this type of book'),
+  authorPenName: z.string().describe('Pen name of the author who wrote this book'),
+  bookCoverPrompt: z.string().describe('A single sentence visual description of what the book cover should look like, including style, colors, imagery, and mood'),
+  sections: z.array(SectionSchema).describe('Book sections with page ranges and summaries'),
 })
 
 export const BookListSchema = z.object({
-  books: z.array(BookSchema).min(8).max(20).describe('A list of fictional books matching the search criteria'),
+  books: z.array(BookSchema).length(PAGE_SIZE).describe(`A list of exactly ${PAGE_SIZE} fictional books matching the search criteria`),
 })
 
 export const PageContentSchema = z.object({
@@ -47,7 +59,74 @@ export const PageContentSchema = z.object({
 })
 
 /**
- * Generate a list of fictional books based on search parameters
+ * Generate fictional authors for a specific genre with retry logic
+ */
+export async function generateAuthors(params: {
+  genrePrompt: string
+  languageCode: string
+  modelName: string
+  modelDomain: string
+  count: number
+}): Promise<Array<z.infer<typeof AuthorSchema>>> {
+  console.log('generateAuthors called with count:', params.count, 'for genre:', params.genrePrompt)
+  
+  const model = createModel(params.modelDomain, params.modelName)
+  
+  const systemPrompt = `You are a curator of fictional authors who write in specific genres. Generate completely original, fictional authors that never existed.
+
+GENRE CONTEXT: ${params.genrePrompt}
+LANGUAGE: Generate names and content in language code "${params.languageCode}"
+
+REQUIREMENTS:
+- Create diverse, unique authors with distinct writing styles
+- Make pen names memorable and appropriate for the genre
+- Write compelling biographies that establish their fictional literary careers
+- Vary writing styles to create interesting diversity
+- Authors should feel like they belong in this genre but have unique voices
+- Make them feel real and established in the literary world
+
+CREATIVITY: Be highly creative and unexpected in your author creations. Think of authors who might exist in parallel literary universes.`
+
+  const dynamicSchema = z.object({
+    authors: z.array(AuthorSchema).length(params.count).describe(`Exactly ${params.count} fictional authors for the specified genre`),
+  })
+
+  // Retry logic - up to 3 attempts
+  let lastError: Error | null = null
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      console.log(`Author generation attempt ${attempt}/${3}`)
+      
+      const result = await generateObject({
+        model,
+        system: systemPrompt,
+        prompt: `Generate exactly ${params.count} diverse fictional authors who write in this genre. Make them unique and memorable.`,
+        schema: dynamicSchema,
+        temperature: 0.9, // High creativity
+      })
+
+      console.log(`✅ Authors generated successfully on attempt ${attempt}`)
+      return result.object.authors
+      
+    } catch (error) {
+      lastError = error as Error
+      console.error(`❌ Author generation attempt ${attempt} failed:`, error)
+      
+      if (attempt === 3) {
+        console.error('💥 All author generation attempts failed')
+        throw lastError
+      }
+      
+      // Wait before retry (exponential backoff)
+      await new Promise(resolve => setTimeout(resolve, 1000 * attempt))
+    }
+  }
+  
+  throw lastError || new Error('Author generation failed after all retries')
+}
+
+/**
+ * Generate a list of fictional books based on search parameters and existing authors
  */
 export async function generateBooks(params: {
   freeText: string | null
@@ -55,15 +134,19 @@ export async function generateBooks(params: {
   tagPrompts: string[]
   languageCode: string
   modelName: string
-  existingAuthorPenNames?: string[]
+  modelDomain: string
+  pageNumber: number
+  pageSize: number
+  authorPenNames: string[] // Now required - authors must exist
 }): Promise<{ books: Array<z.infer<typeof BookSchema>> }> {
-  const model = modelConfigs[params.modelName as keyof typeof modelConfigs]
-  if (!model) {
-    throw new Error(`Unsupported model: ${params.modelName}`)
-  }
+  console.log('generateBooks called with authors:', params.authorPenNames)
+  
+  const model = createModel(params.modelDomain, params.modelName)
 
   // Build the system prompt
   const systemPrompt = `You are a librarian of an infinite, hallucinatory library. Generate completely fictional books that never existed.
+
+PAGINATION CONTEXT: You are generating page ${params.pageNumber} of results, with ${params.pageSize} books per page. Generate books ${((params.pageNumber - 1) * params.pageSize) + 1} through ${params.pageNumber * params.pageSize} in the infinite catalog for this search query.
 
 GENRE CONTEXT: ${params.genrePrompt}
 
@@ -72,11 +155,9 @@ TAG INFLUENCES: ${params.tagPrompts.join(', ')}
 LANGUAGE: Generate titles and content in language code "${params.languageCode}"
 
 AUTHOR ASSIGNMENT:
-${params.existingAuthorPenNames && params.existingAuthorPenNames.length > 0 
-  ? `- For some books, use existing authors by setting "authorPenName" to one of: ${params.existingAuthorPenNames.join(', ')}
-- For other books, create new authors by providing "author" object
-- Mix both approaches for variety` 
-  : `- Create new authors for all books by providing "author" object`}
+You MUST assign each book to one of these existing authors: ${params.authorPenNames.join(', ')}
+Use "authorPenName" field to specify which author wrote each book.
+Distribute books among the available authors to create variety.
 
 SECTION REQUIREMENTS:
 - Create realistic sections based on book type (chapters for novels, recipes for cookbooks, papers for academic works, etc.)
@@ -98,6 +179,8 @@ REQUIREMENTS:
 - Create compelling summaries that make readers want to explore
 - Make titles memorable and genre-appropriate
 - Ensure sections flow logically and cover the entire page range
+- Each book must be assigned to one of the provided authors
+- Generate vivid, single-sentence book cover descriptions that capture the essence and mood of each book
 
 ${params.freeText ? `USER QUERY: "${params.freeText}"` : ''}
 
@@ -106,9 +189,9 @@ Generate books that feel like they could exist in a parallel universe's literary
   const result = await generateObject({
     model,
     system: systemPrompt,
-    prompt: 'Generate a diverse collection of fictional books for this infinite library.',
+    prompt: `Generate exactly ${params.pageSize} diverse fictional books for page ${params.pageNumber}, each assigned to one of the available authors.`,
     schema: BookListSchema,
-    temperature: 0.8, // Higher creativity
+    temperature: 0.9, // High creativity as requested
   })
 
   return result.object
@@ -126,11 +209,9 @@ export async function generatePage(params: {
   sections: Array<z.infer<typeof SectionSchema>>
   languageCode: string
   modelName: string
+  modelDomain: string
 }): Promise<string> {
-  const model = modelConfigs[params.modelName as keyof typeof modelConfigs]
-  if (!model) {
-    throw new Error(`Unsupported model: ${params.modelName}`)
-  }
+  const model = createModel(params.modelDomain, params.modelName)
 
   // Find which section this page belongs to
   const currentSection = params.sections.find(section => 

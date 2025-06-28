@@ -19,10 +19,15 @@ export const queryKeys = {
     all: ['genres'] as const,
     list: () => [...queryKeys.genres.all, 'list'] as const,
   },
+  models: {
+    all: ['models'] as const,
+    list: () => [...queryKeys.models.all, 'list'] as const,
+  },
   tags: {
     all: ['tags'] as const,
     list: () => [...queryKeys.tags.all, 'list'] as const,
     byCategory: (categoryId: number) => [...queryKeys.tags.all, 'category', categoryId] as const,
+    byGenre: (genreId?: string) => [...queryKeys.tags.all, 'genre', genreId] as const,
   },
   searches: {
     all: ['searches'] as const,
@@ -70,6 +75,38 @@ export function useGenres() {
   })
 }
 
+// Models
+export function useModels() {
+  const supabase = createSupabaseBrowserClient()
+  
+  return useQuery({
+    queryKey: queryKeys.models.list(),
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('models')
+        .select(`
+          id,
+          name,
+          domain_code,
+          context_len,
+          prompt_cost,
+          completion_cost,
+          is_active,
+          model_domains (
+            label
+          )
+        `)
+        .eq('is_active', true)
+        .order('domain_code')
+        .order('name')
+      
+      if (error) throw error
+      return data
+    },
+    staleTime: 30 * 60 * 1000, // 30 minutes - models don't change often
+  })
+}
+
 // Tags
 export function useTags() {
   const supabase = createSupabaseBrowserClient()
@@ -94,6 +131,42 @@ export function useTags() {
       if (error) throw error
       return data
     },
+    staleTime: 30 * 60 * 1000, // 30 minutes
+  })
+}
+
+// Tags filtered by genre
+export function useTagsByGenre(genreId?: string) {
+  const supabase = createSupabaseBrowserClient()
+  
+  return useQuery({
+    queryKey: queryKeys.tags.byGenre(genreId),
+    queryFn: async () => {
+      if (!genreId) return []
+      
+      const { data, error } = await supabase
+        .from('genre_tags')
+        .select(`
+          tags (
+            id,
+            slug,
+            label,
+            prompt_boost,
+            tag_categories (
+              id,
+              label,
+              slug,
+              order_index
+            )
+          )
+        `)
+        .eq('genre_id', genreId)
+        .order('tags(label)')
+      
+      if (error) throw error
+      return data?.map(gt => gt.tags).filter(Boolean) || []
+    },
+    enabled: !!genreId,
     staleTime: 30 * 60 * 1000, // 30 minutes
   })
 }

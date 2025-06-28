@@ -51,13 +51,7 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <div 
-            className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 dark:from-slate-900 dark:to-slate-800"
-            style={{
-              backgroundImage: 'url(/marbe-light-amber-texture.png)',
-              backgroundSize: 'cover',
-              backgroundPosition: 'center',
-              backgroundAttachment: 'fixed'
-            }}
+            className="min-h-screen bg-gradient-to-r from-gray-100 via-white to-gray-100 dark:bg-gradient-to-br dark:from-slate-900 dark:to-slate-800"
           >
             {/* Dark mode overlay */}
             <div className="hidden dark:block absolute inset-0 bg-gradient-to-br from-amber-950/95 to-yellow-950/95" />
@@ -75,11 +69,8 @@ export default function RootLayout({
                     <footer className="border-t bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm">
                       <div className="container mx-auto px-4 py-8">
                         <div className="text-center text-slate-600 dark:text-slate-400">
-                          <p className="mb-2">
-                            Discover and create infinite stories with AI. Browse existing books or generate new ones tailored to your imagination.
-                          </p>
                           <p className="text-sm">
-                            © 2024 MirageCodex. All books and authors are entirely fictional.
+                            © {new Date().getFullYear()} MirageCodex. All books and authors are entirely fictional.
                           </p>
                         </div>
                       </div>

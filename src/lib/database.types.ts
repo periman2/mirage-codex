@@ -65,6 +65,47 @@ export type Database = {
           },
         ]
       }
+      book_sections: {
+        Row: {
+          book_id: string
+          created_at: string | null
+          from_page: number
+          id: string
+          order_index: number
+          summary: string
+          title: string
+          to_page: number
+        }
+        Insert: {
+          book_id: string
+          created_at?: string | null
+          from_page: number
+          id?: string
+          order_index: number
+          summary: string
+          title: string
+          to_page: number
+        }
+        Update: {
+          book_id?: string
+          created_at?: string | null
+          from_page?: number
+          id?: string
+          order_index?: number
+          summary?: string
+          title?: string
+          to_page?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "book_sections_book_id_fkey"
+            columns: ["book_id"]
+            isOneToOne: false
+            referencedRelation: "books"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       bookmarks: {
         Row: {
           created_at: string | null
@@ -103,6 +144,7 @@ export type Database = {
       books: {
         Row: {
           author_id: string
+          book_cover_prompt: string | null
           cover_url: string | null
           created_at: string | null
           id: string
@@ -113,6 +155,7 @@ export type Database = {
         }
         Insert: {
           author_id: string
+          book_cover_prompt?: string | null
           cover_url?: string | null
           created_at?: string | null
           id?: string
@@ -123,6 +166,7 @@ export type Database = {
         }
         Update: {
           author_id?: string
+          book_cover_prompt?: string | null
           cover_url?: string | null
           created_at?: string | null
           id?: string
@@ -423,6 +467,89 @@ export type Database = {
           },
         ]
       }
+      search_results: {
+        Row: {
+          author_bio: string | null
+          author_id: string
+          author_pen_name: string
+          author_style_prompt: string | null
+          book_cover_url: string | null
+          book_id: string
+          book_page_count: number
+          book_sections: Json
+          book_summary: string
+          book_title: string
+          created_at: string | null
+          free_text: string | null
+          genre_slug: string
+          hash: string
+          id: string
+          language_code: string
+          model_id: number
+          page_number: number
+          page_size: number
+          rank: number
+          tag_slugs: string[] | null
+          user_id: string
+        }
+        Insert: {
+          author_bio?: string | null
+          author_id: string
+          author_pen_name: string
+          author_style_prompt?: string | null
+          book_cover_url?: string | null
+          book_id: string
+          book_page_count: number
+          book_sections: Json
+          book_summary: string
+          book_title: string
+          created_at?: string | null
+          free_text?: string | null
+          genre_slug: string
+          hash: string
+          id?: string
+          language_code: string
+          model_id: number
+          page_number?: number
+          page_size?: number
+          rank: number
+          tag_slugs?: string[] | null
+          user_id: string
+        }
+        Update: {
+          author_bio?: string | null
+          author_id?: string
+          author_pen_name?: string
+          author_style_prompt?: string | null
+          book_cover_url?: string | null
+          book_id?: string
+          book_page_count?: number
+          book_sections?: Json
+          book_summary?: string
+          book_title?: string
+          created_at?: string | null
+          free_text?: string | null
+          genre_slug?: string
+          hash?: string
+          id?: string
+          language_code?: string
+          model_id?: number
+          page_number?: number
+          page_size?: number
+          rank?: number
+          tag_slugs?: string[] | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "search_results_model_id_fkey"
+            columns: ["model_id"]
+            isOneToOne: false
+            referencedRelation: "models"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       searches: {
         Row: {
           created_at: string | null
@@ -595,7 +722,46 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_random_authors_by_genre: {
+        Args: { p_genre_slug: string; p_limit: number }
+        Returns: {
+          id: string
+          pen_name: string
+          style_prompt: string
+          bio: string
+        }[]
+      }
+      get_search_results: {
+        Args: { p_hash: string }
+        Returns: {
+          book_id: string
+          book_title: string
+          book_summary: string
+          book_page_count: number
+          book_cover_url: string
+          book_cover_prompt: string
+          book_sections: Json
+          author_id: string
+          author_pen_name: string
+          author_bio: string
+          language_code: string
+        }[]
+      }
+      save_search_results: {
+        Args: {
+          p_hash: string
+          p_user_id: string
+          p_free_text: string
+          p_language_code: string
+          p_genre_slug: string
+          p_tag_slugs: string[]
+          p_model_id: number
+          p_page_number: number
+          p_page_size: number
+          p_books: Json
+        }
+        Returns: Json
+      }
     }
     Enums: {
       [_ in never]: never
