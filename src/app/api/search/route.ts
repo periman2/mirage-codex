@@ -48,7 +48,8 @@ async function selectExistingAuthorsByGenre(
  * Save generated authors to database with random suffixes
  */
 async function saveGeneratedAuthors(
-  authors: Array<z.infer<typeof AuthorSchema>>
+  authors: Array<z.infer<typeof AuthorSchema>>,
+  currentGenreSlug: string
 ): Promise<Array<{ id: string; penName: string; stylePrompt: string; bio: string }>> {
   console.log('💾 Saving generated authors to database...')
   
@@ -78,6 +79,68 @@ async function saveGeneratedAuthors(
   }
 
   console.log(`✅ Saved ${savedAuthors.length} authors to database`)
+
+  // Now assign genres to each author
+  console.log('🎭 Assigning genres to authors...')
+  
+  // Get the current genre ID
+  const { data: currentGenre } = await adminSupabase
+    .from('genres')
+    .select('id')
+    .eq('slug', currentGenreSlug)
+    .single()
+
+  if (!currentGenre) {
+    throw new Error(`Genre not found: ${currentGenreSlug}`)
+  }
+
+  // Get all available genres for random assignment
+  const { data: allGenres } = await adminSupabase
+    .from('genres')
+    .select('id')
+    .neq('id', currentGenre.id) // Exclude current genre since we'll add it separately
+
+  const availableGenres = allGenres || []
+
+  // Assign genres to each author
+  for (const author of savedAuthors) {
+    const genreAssignments = []
+    
+    // Always assign the current search genre
+    genreAssignments.push({
+      author_id: author.id,
+      genre_id: currentGenre.id
+    })
+
+    // Randomly assign 0-5 additional genres
+    const additionalGenreCount = Math.floor(Math.random() * 6) // 0-5
+    console.log(`👤 ${author.pen_name}: Adding ${additionalGenreCount} additional genres`)
+
+    if (additionalGenreCount > 0 && availableGenres.length > 0) {
+      // Shuffle available genres and take the first N
+      const shuffledGenres = [...availableGenres].sort(() => Math.random() - 0.5)
+      const selectedGenres = shuffledGenres.slice(0, Math.min(additionalGenreCount, availableGenres.length))
+      
+      for (const genre of selectedGenres) {
+        genreAssignments.push({
+          author_id: author.id,
+          genre_id: genre.id
+        })
+      }
+    }
+
+    // Insert genre assignments
+    const { error: genreError } = await adminSupabase
+      .from('author_genres')
+      .insert(genreAssignments)
+
+    if (genreError) {
+      console.error(`❌ Failed to assign genres to author ${author.pen_name}:`, genreError)
+      throw new Error(`Failed to assign genres to author: ${genreError.message}`)
+    }
+
+    console.log(`✅ Assigned ${genreAssignments.length} genres to ${author.pen_name}`)
+  }
   
   return savedAuthors.map((author: any) => ({
     id: author.id,
@@ -278,7 +341,7 @@ export async function POST(request: NextRequest) {
       console.log('✅ Authors generated successfully')
 
       // Save generated authors to database (this adds the random suffixes)
-      const savedAuthors = await saveGeneratedAuthors(generatedAuthors)
+      const savedAuthors = await saveGeneratedAuthors(generatedAuthors, searchParams.genreSlug)
       
       // Combine existing and new authors
       finalAuthors = [...finalAuthors, ...savedAuthors]
@@ -308,40 +371,29 @@ export async function POST(request: NextRequest) {
       modelDomain: model.domain_code,
       pageNumber: searchParams.pageNumber,
       pageSize: searchParams.pageSize,
-      authorPenNames: finalAuthors.map(a => a.penName),
+      // Remove authorPenNames - we'll assign authors randomly after generation
     })
 
     console.log('✅ Books generated successfully:', generatedBooks.books.length)
 
-    // Debug: Log what author names the AI returned
-    console.log('📚 AI returned books with authors:', generatedBooks.books.map(b => b.authorPenName))
-    console.log('👥 Available authors we have:', finalAuthors.map(a => a.penName))
-
-    // Map books to include author IDs for database saving
-    const booksWithAuthorIds = generatedBooks.books.map(book => {
-      // First try exact match
-      let author = finalAuthors.find(a => a.penName === book.authorPenName)
+    // Randomly assign authors to books
+    console.log('🎲 Randomly assigning authors to books...')
+    console.log('👥 Available authors:', finalAuthors.map(a => a.penName))
+    
+    // Shuffle authors to ensure random distribution
+    const shuffledAuthors = [...finalAuthors].sort(() => Math.random() - 0.5)
+    
+    const booksWithAuthorIds = generatedBooks.books.map((book, index) => {
+      // Cycle through shuffled authors if we have more books than authors
+      const authorIndex = index % finalAuthors.length
+      const assignedAuthor = shuffledAuthors[authorIndex]
       
-      // If exact match fails, try to find by base name (without suffix)
-      if (!author) {
-        console.log(`🔍 Exact match failed for "${book.authorPenName}", trying base name match...`)
-        author = finalAuthors.find(a => {
-          // Extract base name by removing the " - [number]" suffix
-          const baseName = a.penName.replace(/ - \d+$/, '')
-          return baseName === book.authorPenName
-        })
-      }
+      console.log(`📖 Assigned "${book.title}" to "${assignedAuthor.penName}"`)
       
-      if (!author) {
-        console.error('❌ Available authors:', finalAuthors.map(a => a.penName))
-        console.error('❌ Looking for:', book.authorPenName)
-        throw new Error(`Author not found for pen name: ${book.authorPenName}`)
-      }
-      
-      console.log(`✅ Matched "${book.authorPenName}" to "${author.penName}"`)
       return {
         ...book,
-        authorId: author.id,
+        authorId: assignedAuthor.id,
+        authorPenName: assignedAuthor.penName, // Set the author name for display
         bookCoverPrompt: book.bookCoverPrompt
       }
     })

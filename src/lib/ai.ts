@@ -45,7 +45,6 @@ export const BookSchema = z.object({
   title: z.string().describe('The book title'),
   summary: z.string().describe('A compelling book summary (2-3 sentences)'),
   pageCount: z.number().describe('Realistic page count for this type of book'),
-  authorPenName: z.string().describe('Pen name of the author who wrote this book'),
   bookCoverPrompt: z.string().describe('A single sentence visual description of what the book cover should look like, including style, colors, imagery, and mood'),
   sections: z.array(SectionSchema).describe('Book sections with page ranges and summaries'),
 })
@@ -137,9 +136,9 @@ export async function generateBooks(params: {
   modelDomain: string
   pageNumber: number
   pageSize: number
-  authorPenNames: string[] // Now required - authors must exist
+  authorPenNames?: string[] // Optional - will assign authors randomly after generation
 }): Promise<{ books: Array<z.infer<typeof BookSchema>> }> {
-  console.log('generateBooks called with authors:', params.authorPenNames)
+  console.log('generateBooks called without author assignment')
   
   const model = createModel(params.modelDomain, params.modelName)
 
@@ -153,11 +152,6 @@ GENRE CONTEXT: ${params.genrePrompt}
 TAG INFLUENCES: ${params.tagPrompts.join(', ')}
 
 LANGUAGE: Generate titles and content in language code "${params.languageCode}"
-
-AUTHOR ASSIGNMENT:
-You MUST assign each book to one of these existing authors: ${params.authorPenNames.join(', ')}
-Use "authorPenName" field to specify which author wrote each book.
-Distribute books among the available authors to create variety.
 
 SECTION REQUIREMENTS:
 - Create realistic sections based on book type (chapters for novels, recipes for cookbooks, papers for academic works, etc.)
@@ -179,8 +173,8 @@ REQUIREMENTS:
 - Create compelling summaries that make readers want to explore
 - Make titles memorable and genre-appropriate
 - Ensure sections flow logically and cover the entire page range
-- Each book must be assigned to one of the provided authors
 - Generate vivid, single-sentence book cover descriptions that capture the essence and mood of each book
+- Do not include author information - authors will be assigned separately
 
 ${params.freeText ? `USER QUERY: "${params.freeText}"` : ''}
 
@@ -189,7 +183,7 @@ Generate books that feel like they could exist in a parallel universe's literary
   const result = await generateObject({
     model,
     system: systemPrompt,
-    prompt: `Generate exactly ${params.pageSize} diverse fictional books for page ${params.pageNumber}, each assigned to one of the available authors.`,
+    prompt: `Generate exactly ${params.pageSize} diverse fictional books for page ${params.pageNumber}.`,
     schema: BookListSchema,
     temperature: 0.9, // High creativity as requested
   })
