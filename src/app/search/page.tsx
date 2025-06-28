@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
+import { BookSearchResultCard } from '@/components/book-search-result-card'
 import { Search, Sparks, Book, ArrowLeft, ArrowRight } from 'iconoir-react'
 import { toast } from 'sonner'
 import { Database } from '@/lib/database.types'
@@ -32,81 +33,6 @@ type SearchResultBook = {
   }
   language: string
   sections: any[]
-}
-
-// Enhanced BookCard component with proper loading states
-function BookCard({ book }: { book: SearchResultBook }) {
-  const [imageLoading, setImageLoading] = useState(true)
-  const [imageError, setImageError] = useState(false)
-
-  const handleImageLoad = () => {
-    setImageLoading(false)
-  }
-
-  const handleImageError = () => {
-    setImageLoading(false)
-    setImageError(true)
-  }
-
-  return (
-    <div className="group cursor-pointer transition-all duration-300 hover:scale-105 hover:shadow-xl rounded-lg overflow-hidden">
-      {/* Book Cover Container - Square format */}
-      <div className="aspect-square w-full relative overflow-hidden shadow-md">
-        {/* Gradient background for light mode */}
-        <div className="absolute inset-0 bg-gradient-to-r from-gray-200 via-gray-50 to-gray-200 dark:from-amber-900 dark:to-amber-800" />
-        
-        {!imageError && (
-          <>
-            {/* Loading Spinner */}
-            {imageLoading && (
-              <div className="absolute inset-0 bg-gradient-to-br from-amber-100 to-amber-200 dark:from-amber-900 dark:to-amber-800 flex items-center justify-center z-10">
-                <div className="flex flex-col items-center space-y-2">
-                  <Sparks className="h-6 w-6 text-amber-600 dark:text-amber-300 animate-spin" />
-                  <div className="text-xs text-amber-700 dark:text-amber-200 font-medium">
-                    Generating...
-                  </div>
-                </div>
-              </div>
-            )}
-            
-            {/* Book Cover Image */}
-            <img
-              src={`/api/book/${book.id}/cover`}
-              alt={`Cover of ${book.title}`}
-              className={`w-full h-full object-cover transition-opacity duration-300 relative z-10 ${
-                imageLoading ? 'opacity-0' : 'opacity-100'
-              }`}
-              onLoad={handleImageLoad}
-              onError={handleImageError}
-            />
-          </>
-        )}
-        
-        {/* Book Title Overlay at top with strong shadow for visibility */}
-        <div className="absolute top-4 left-4 right-4 z-20">
-          <h3 className="text-white font-semibold text-sm leading-tight line-clamp-2 px-3 py-2 rounded-lg bg-black/30 backdrop-blur-sm shadow-lg drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
-            {book.title}
-          </h3>
-        </div>
-      </div>
-      
-      {/* Book Details Below Cover - Not overlapping */}
-      <div className="w-full">
-        {/* Blurred background for better readability */}
-        <div className="bg-white/90 dark:bg-slate-800/90 backdrop-blur-md rounded-b-lg p-4 shadow-lg border border-white/20 dark:border-slate-700/50 border-t-0">
-          <p className="text-sm font-medium text-slate-700 dark:text-slate-200 line-clamp-1 mb-2">
-            by {book.author.penName}
-          </p>
-          <p className="text-sm text-slate-600 dark:text-slate-300 line-clamp-2 mb-3 leading-relaxed">
-            {book.summary}
-          </p>
-          <div className="flex items-center justify-between text-sm text-slate-500 dark:text-slate-400">
-            <span className="truncate font-medium">{book.pageCount} pages</span>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
 }
 
 interface SearchResult {
@@ -285,18 +211,18 @@ export default function SearchPage() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="max-w-4xl mx-auto">
-        <div className="text-center mb-8">
-          <h1 className="text-4xl md:text-5xl font-bold text-slate-900 dark:text-amber-100 mb-6">
+    <div className="container mx-auto px-4 py-6">
+      <div className="max-w-6xl mx-auto">
+        <div className="text-center mb-6">
+          <h1 className="text-4xl md:text-5xl font-bold text-slate-900 dark:text-amber-100 mb-4">
             Dive into infinity
           </h1>
-          <p className="text-lg md:text-xl text-slate-600 dark:text-amber-50 max-w-2xl mx-auto mb-8 leading-relaxed">
-            Search through the mirage of possibilities. Describe your ideal book and let it be found within the codex.
+          <p className="text-lg md:text-xl text-slate-600 dark:text-amber-50 max-w-2xl mx-auto mb-6 leading-relaxed">
+            Describe your ideal book and let it be found within the codex.
           </p>
 
           {/* Main Search Input */}
-          <div className="relative max-w-2xl mx-auto mb-8">
+          <div className="relative w-full mx-auto mb-6">
             <Input
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -319,14 +245,14 @@ export default function SearchPage() {
         </div>
 
         {/* Search Parameters */}
-        <Card className="bg-white/60 dark:bg-transparent backdrop-blur-sm border border-amber-200/30 dark:border-amber-200/40 mb-8 shadow-sm">
-          <CardHeader>
+        <Card className="bg-white/60 dark:bg-transparent backdrop-blur-sm border border-amber-200/30 dark:border-amber-200/40 mb-6 shadow-sm">
+          <CardHeader className="pb-4">
             <CardTitle className="text-xl md:text-2xl text-slate-800 dark:text-amber-100">
               Search Parameters
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <CardContent className="pt-0">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
               {/* Language Selection */}
               <div className="space-y-3">
                 <Label className="text-base font-medium text-slate-700 dark:text-amber-200">Language</Label>
@@ -406,11 +332,11 @@ export default function SearchPage() {
 
             {/* Tags Selection */}
             {selectedGenre && availableTags.length > 0 && (
-              <div className="mt-8 space-y-4">
+              <div className="mt-6 space-y-3">
                 <Label className="text-base font-medium text-slate-700 dark:text-amber-200">
                   Tags for {genres?.find(g => g.slug === selectedGenre)?.label} (optional)
                 </Label>
-                <div className="flex flex-wrap gap-3 max-h-40 overflow-y-auto">
+                <div className="flex flex-wrap gap-2 max-h-40 overflow-y-auto">
                   {availableTags.map((tag) => (
                     <Badge
                       key={tag.slug}
@@ -434,7 +360,7 @@ export default function SearchPage() {
         {/* Results */}
         {searchMutation.isPending ? (
           <Card className="bg-white/60 dark:bg-transparent backdrop-blur-sm border border-amber-200/30 dark:border-amber-200/40 shadow-sm">
-            <CardContent className="p-12 text-center">
+            <CardContent className="p-8 text-center">
               <div className="flex flex-col items-center space-y-4">
                 <div className="relative">
                   <Sparks className="h-12 w-12 text-amber-600 dark:text-amber-300 animate-spin" />
@@ -444,9 +370,6 @@ export default function SearchPage() {
                   <h3 className="text-xl md:text-2xl font-semibold text-slate-800 dark:text-amber-100">
                     Weaving your query into existence...
                   </h3>
-                  <p className="text-lg text-slate-600 dark:text-amber-50 max-w-md">
-                    Our AI is crafting books tailored to your search. This may take a moment.
-                  </p>
                 </div>
                 <div className="flex space-x-1 mt-4">
                   <div className="w-2 h-2 bg-amber-600 dark:bg-amber-300 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
@@ -457,7 +380,7 @@ export default function SearchPage() {
             </CardContent>
           </Card>
         ) : searchMutation.data ? (
-          <div className="space-y-4">
+          <div className="space-y-3">
             <div className="flex items-center justify-between">
               <h2 className="text-2xl md:text-3xl font-semibold text-slate-800 dark:text-amber-100">
                 Books (Page {currentPage})
@@ -469,14 +392,14 @@ export default function SearchPage() {
               )}
             </div>
             
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-2">
               {searchMutation.data.books.map((book) => (
-                <BookCard key={book.id} book={book} />
+                <BookSearchResultCard key={book.id} book={book} />
               ))}
             </div>
 
             {/* Pagination Controls */}
-            <div className="flex items-center justify-center space-x-6 mt-8">
+            <div className="flex items-center justify-center space-x-6 mt-6">
               <Button
                 onClick={() => handlePageChange(currentPage - 1)}
                 disabled={currentPage <= 1 || searchMutation.isPending}
@@ -506,7 +429,7 @@ export default function SearchPage() {
           </div>
         ) : (
           <Card className="bg-white/60 dark:bg-transparent backdrop-blur-sm border border-amber-200/30 dark:border-amber-200/40 shadow-sm">
-            <CardContent className="p-12 text-center">
+            <CardContent className="p-8 text-center">
               <Book className="h-16 w-16 mx-auto mb-6 text-amber-400 dark:text-amber-300" />
               <p className="text-lg text-slate-600 dark:text-amber-50">
                 Select a genre and describe your ideal book to get started.

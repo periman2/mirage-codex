@@ -67,13 +67,13 @@ export function Navbar() {
             <nav className="hidden md:flex items-center space-x-6">
               <a 
                 href="/" 
-                className="text-slate-700 hover:text-amber-700 dark:text-amber-100 dark:hover:text-amber-200 transition-colors"
+                className="text-sm text-slate-700 hover:text-amber-700 dark:text-amber-100 dark:hover:text-amber-200 transition-colors"
               >
                 Browse
               </a>
               <button
                 onClick={handleSearchClick}
-                className="text-slate-700 hover:text-amber-700 dark:text-amber-100 dark:hover:text-amber-200 transition-colors"
+                className="text-sm text-slate-700 hover:text-amber-700 dark:text-amber-100 dark:hover:text-amber-200 transition-colors"
               >
                 Search {!user && '(Login Required)'}
               </button>
@@ -105,7 +105,7 @@ export function Navbar() {
             <nav className="md:hidden absolute left-0 right-0 top-full bg-white/95 dark:bg-amber-950/95 backdrop-blur-md border-b border-amber-200/30 dark:border-amber-200/40 px-4 py-3 space-y-2 shadow-sm">
               <a 
                 href="/" 
-                className="block px-2 py-1 text-slate-700 hover:text-amber-700 dark:text-amber-100 dark:hover:text-amber-200 transition-colors"
+                className="block px-2 py-1 text-sm text-slate-700 hover:text-amber-700 dark:text-amber-100 dark:hover:text-amber-200 transition-colors"
                 onClick={() => setIsMobileMenuOpen(false)}
               >
                 Browse
@@ -115,7 +115,7 @@ export function Navbar() {
                   handleSearchClick()
                   setIsMobileMenuOpen(false)
                 }}
-                className="block px-2 py-1 text-left text-slate-700 hover:text-amber-700 dark:text-amber-100 dark:hover:text-amber-200 transition-colors"
+                className="block px-2 py-1 text-left text-sm text-slate-700 hover:text-amber-700 dark:text-amber-100 dark:hover:text-amber-200 transition-colors"
               >
                 Search {!user && '(Login Required)'}
               </button>

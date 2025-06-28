@@ -26,15 +26,27 @@ export default function HomePage() {
   }
 
   return (
-    <div className="min-h-[calc(100vh-80px)] flex items-center justify-center px-4">
-      <div className="w-full max-w-4xl mx-auto">
+    <div className="min-h-[calc(100vh-80px)] flex items-center justify-center px-4 relative">
+      {/* Marble texture background */}
+      <div 
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          backgroundImage: 'url(/marble_texture.png)',
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat',
+          opacity: 0.24
+        }}
+      />
+      
+      <div className="w-full max-w-6xl mx-auto relative z-10">
         {/* Hero Section */}
-        <div className="text-center mb-12 md:mb-16 space-y-6 md:space-y-8">
+        <div className="text-center mb-8 md:mb-12 space-y-4 md:space-y-6">
           {/* Main Title - Mirage Codex */}
           <div className="relative">
             <div className="flex items-baseline justify-center">
               <h1
-                className="text-4xl md:text-7xl lg:text-8xl font-bold text-slate-700 dark:text-amber-100 leading-tight tracking-wide"
+                className="text-4xl md:text-7xl lg:text-8xl font-bold text-[#1f2630] dark:text-amber-100 leading-tight tracking-wide"
                 style={{ fontFamily: 'var(--font-playfair-display), serif', letterSpacing: '0.1em' }}
               >
                 M
@@ -47,7 +59,10 @@ export default function HomePage() {
                 </span>
                 rage
               </h1>
-              <span className="mx-4 md:mx-6 lg:mx-8 text-4xl md:text-7xl lg:text-8xl font-bold text-slate-700 dark:text-amber-100"></span>
+              {/* Reduced gap and added subtle divider */}
+              <div className="mx-2 md:mx-3 lg:mx-4 flex items-center">
+                <div className="w-px h-8 md:h-16 lg:h-20 bg-[#B89C51] opacity-30"></div>
+              </div>
               <h1
                 className="text-4xl md:text-7xl lg:text-8xl font-bold text-[#B89C51] dark:text-[#D4AF37] leading-tight tracking-wide"
                 style={{ fontFamily: 'var(--font-playfair-display), serif', letterSpacing: '0.1em' }}
@@ -56,8 +71,13 @@ export default function HomePage() {
               </h1>
             </div>
 
-            {/* Subtitle Quote */}
-            <div className="mt-4 md:mt-6">
+            {/* Subtitle Quote with hairline dividers */}
+            <div className="mt-4 md:mt-6 space-y-3">
+              {/* Top divider */}
+              <div className="flex items-center justify-center">
+                <div className="h-px bg-[#B89C51] opacity-20 w-8"></div>
+              </div>
+              
               <p
                 className="text-lg md:text-xl lg:text-2xl text-slate-600 dark:text-amber-50/90 leading-relaxed font-light italic"
                 style={{ fontFamily: 'var(--font-playfair-display), serif' }}
@@ -66,49 +86,47 @@ export default function HomePage() {
                 The simulacrum of a literary universe
                 <span className="text-xl md:text-2xl lg:text-3xl text-[#B89C51] dark:text-[#D4AF37]">"</span>
               </p>
-            </div>
-
-            {/* Decorative line */}
-            <div className="mt-6 md:mt-8 flex items-center justify-center">
-              <div className="h-px bg-gradient-to-r from-transparent via-[#B89C51] to-transparent w-32 md:w-48"></div>
+              
+              {/* Bottom divider */}
+              <div className="flex items-center justify-center">
+                <div className="h-px bg-[#B89C51] opacity-20 w-8"></div>
+              </div>
             </div>
           </div>
 
           {/* Poetic Description */}
-          <div className="max-w-3xl mx-auto space-y-4 md:space-y-6">
-            <div className="backdrop-blur-sm bg-white/20 dark:bg-amber-950/20 rounded-2xl p-6 md:p-8">
+          <div className="max-w-lg mx-auto space-y-3 md:space-y-4">
+            <div className="backdrop-blur-sm bg-transparent rounded-2xl p-4 md:p-6 border border-[#B89C51]/10 dark:border-[#B89C51]/30">
               <p className="text-base md:text-lg text-slate-800 dark:text-amber-50 leading-relaxed max-w-2xl mx-auto">
-                A living archive born from the collective efforts of imaginative seekers. 
-                Each query becomes a conjuration that births books 
-                into being, phantom volumes that exist in the liminal space between 
-                imagination and reality.
-              </p>
-              
-              <p className="text-sm md:text-base text-slate-600 dark:text-amber-50/90 leading-relaxed max-w-xl mx-auto italic mt-4">
-                Browse the dreams of others, or weave your own into the ever-expanding codex
+                A living archive born from the collective imagination. Each query conjures phantom volumes, existing only in the space between dream and ink.
               </p>
             </div>
           </div>
         </div>
 
         {/* Mode Selection */}
-        <div className="grid grid-cols-1 gap-6 max-w-2xl mx-auto">
-          {/* Search Mode */}
-          <ModeCard
-            mode="search"
-            title="Search"
-            icon={user ? <Search className="w-8 h-8 md:w-10 md:h-10" /> : <Lock className="w-8 h-8 md:w-10 md:h-10" />}
-            description="Search through the mirage of possibilities, become a part of the codex's becoming"
-            requiresAuth={!user}
-            onClick={() => handleModeSelect('search')}
-          />
-          {/* Browse Mode */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-4xl mx-auto">
+          {/* Browse Mode - Primary */}
           <ModeCard
             mode="browse"
             title="Browse"
+            subtitle="Read what others have summoned"
             icon={<Book className="w-8 h-8 md:w-10 md:h-10" />}
             description="Explore what others search. Memories of things to be."
+            isPrimary={true}
             onClick={() => handleModeSelect('browse')}
+          />
+          
+          {/* Search Mode - Secondary with lock */}
+          <ModeCard
+            mode="search"
+            title="Search"
+            subtitle={user ? "Cast your own spell" : "Cast your own spell (login required)"}
+            icon={user ? <Search className="w-8 h-8 md:w-10 md:h-10" /> : <Lock className="w-8 h-8 md:w-10 md:h-10" />}
+            description="Search through the mirage of possibilities."
+            requiresAuth={!user}
+            isPrimary={false}
+            onClick={() => handleModeSelect('search')}
           />
         </div>
       </div>
@@ -124,57 +142,95 @@ export default function HomePage() {
 interface ModeCardProps {
   mode: 'browse' | 'search'
   title: string
+  subtitle: string
   icon: React.ReactNode
   description: string
   requiresAuth?: boolean
+  isPrimary?: boolean
   onClick: () => void
 }
 
-function ModeCard({ mode, title, icon, description, requiresAuth, onClick }: ModeCardProps) {
+function ModeCard({ mode, title, subtitle, icon, description, requiresAuth, isPrimary, onClick }: ModeCardProps) {
   return (
     <button
       onClick={onClick}
       className={`
         group relative overflow-hidden
-        bg-amber-50/5 dark:bg-transparent 
+        ${isPrimary 
+          ? 'bg-[#B89C51] hover:bg-[#A76700] text-white' 
+          : 'bg-amber-50/5 dark:bg-transparent hover:bg-amber-50/8 dark:hover:bg-transparent text-slate-600 dark:text-amber-100'
+        }
         backdrop-blur-sm
         rounded-xl
-        border border-[#A76700]/60 dark:border-amber-200/60
-        p-6 md:p-8
+        ${isPrimary 
+          ? 'border border-[#A76700]/60' 
+          : 'border border-[#A76700]/60 dark:border-amber-200/60'
+        }
+        p-4 md:p-6
         text-center
         transition-all duration-500 ease-out
         hover:scale-102 hover:shadow-2xl 
         hover:shadow-amber-900/8 dark:hover:shadow-amber-400/8
-        hover:bg-amber-50/8 dark:hover:bg-transparent
-        hover:border-amber-800/80 dark:hover:border-amber-100/80
-        focus:outline-none focus:ring-3 focus:ring-amber-200/50 dark:focus:ring-amber-500/20
+        ${!isPrimary && 'hover:border-amber-800/80 dark:hover:border-amber-100/80'}
+        focus:outline-none focus-visible:ring-2 focus-visible:ring-[#B89C51]/60
         min-h-[140px] md:min-h-[160px]
         flex flex-col items-center justify-center
+        ${isPrimary ? 'min-h-[160px] md:min-h-[180px]' : ''}
       `}
     >
+      {/* Radial glow effect on hover */}
+      <div className="absolute inset-0 opacity-0 group-hover:opacity-10 transition-opacity duration-500 ease-out bg-gradient-radial from-[#B89C51] via-transparent to-transparent rounded-xl" />
+
       {/* Icon */}
-      <div className="mb-3 md:mb-4 text-[#B89C51] dark:text-[#B89C51] transition-all duration-500 ease-out group-hover:scale-110 group-hover:-translate-y-2">
+      <div className={`mb-2 md:mb-3 transition-all duration-500 ease-out group-hover:scale-105 group-hover:-translate-y-2 ${
+        isPrimary 
+          ? 'text-white group-hover:text-amber-100' 
+          : 'text-[#B89C51] dark:text-[#B89C51] group-hover:text-[#D4AF37]'
+      }`}>
         <div className="w-8 h-8 md:w-10 md:h-10">
           {icon}
         </div>
       </div>
 
-      {/* Title - moves up on hover */}
+      {/* Title */}
       <h2
-        className="text-xl md:text-2xl font-semibold text-slate-600 dark:text-amber-100 transition-all duration-500 ease-out group-hover:scale-105 group-hover:-translate-y-4 mb-2"
-        style={{ fontFamily: 'var(--font-playfair-display), serif' }}
+        className={`text-xl md:text-2xl font-semibold transition-all duration-500 ease-out group-hover:scale-105 group-hover:-translate-y-4 mb-2 ${
+          isPrimary 
+            ? 'text-white' 
+            : 'text-slate-600 dark:text-amber-100'
+        }`}
+        style={{ 
+          fontFamily: 'var(--font-playfair-display), serif',
+          letterSpacing: '0.5px',
+          fontWeight: 600,
+          fontSize: isPrimary ? '1.25rem' : '1.125rem'
+        }}
       >
-        {requiresAuth ? 'Search' : title}
+        {title}
       </h2>
+
+      {/* Subtitle */}
+      <p className={`text-sm transition-all duration-300 ease-out mb-4 ${
+        isPrimary 
+          ? 'text-amber-100/90' 
+          : 'text-slate-500 dark:text-amber-50/70'
+      }`}
+      style={{ letterSpacing: '0.5px' }}>
+        {subtitle}
+      </p>
 
       {/* Description - slides in from bottom on hover */}
       <div className={`
         transition-all duration-500 ease-out
         opacity-0 translate-y-6
         group-hover:opacity-100 group-hover:translate-y-0
-        absolute bottom-6 md:bottom-8 left-4 right-4 md:left-6 md:right-6
+        absolute bottom-4 md:bottom-6 left-3 right-3 md:left-4 md:right-4
       `}>
-        <p className="text-slate-600 dark:text-amber-50/90 text-xs md:text-sm leading-relaxed text-center">
+        <p className={`leading-relaxed text-center text-xs md:text-sm ${
+          isPrimary 
+            ? 'text-amber-100/80' 
+            : 'text-slate-600 dark:text-amber-50/90'
+        }`}>
           {requiresAuth
             ? 'Sign in to unlock search. Create unique books by searching them.'
             : description
@@ -182,8 +238,10 @@ function ModeCard({ mode, title, icon, description, requiresAuth, onClick }: Mod
         </p>
       </div>
 
-      {/* Subtle gradient overlay on hover */}
-      <div className="absolute inset-0 opacity-0 group-hover:opacity-3 transition-opacity duration-500 ease-out bg-gradient-to-br from-amber-400 to-amber-600 rounded-xl" />
+      {/* Subtle gradient overlay on hover for non-primary */}
+      {!isPrimary && (
+        <div className="absolute inset-0 opacity-0 group-hover:opacity-3 transition-opacity duration-500 ease-out bg-gradient-to-br from-amber-400 to-amber-600 rounded-xl" />
+      )}
     </button>
   )
 }
