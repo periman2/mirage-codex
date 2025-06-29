@@ -99,13 +99,15 @@ export default function HomePage() {
           </div>
 
           {/* Poetic Description */}
-          <div className="max-w-lg mx-auto space-y-3 md:space-y-4">
+          <div className="max-w-2xl mx-auto space-y-3 md:space-y-4">
             <div 
               className="backdrop-blur-sm bg-transparent rounded-2xl p-4 md:p-6 border"
               style={{ borderColor: 'rgba(217, 119, 6, 0.1)' }}
             >
-              <p className="text-base md:text-lg text-slate-800 dark:text-amber-50 leading-relaxed max-w-2xl mx-auto">
-                A living archive born from the collective imagination. This library is been generated while you are searching in it.
+              <p className="text-base md:text-lg text-slate-800 dark:text-amber-50 leading-relaxed max-w-3xl mx-auto">
+                A living archive born from the collective imagination. 
+                <br />
+                This library is been generated while you are searching in it.
               </p>
             </div>
           </div>
