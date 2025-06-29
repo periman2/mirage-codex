@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Sparks } from 'iconoir-react'
+import { Heart, Users } from 'lucide-react'
 
 // Transform database result to frontend-friendly format
 type SearchResultBook = {
@@ -23,6 +24,10 @@ type SearchResultBook = {
     id: string
     modelId: number
     modelName: string
+  }
+  stats?: {
+    likes: number
+    views: number
   }
 }
 
@@ -102,6 +107,18 @@ export function BookSearchResultCard({ book }: { book: SearchResultBook }) {
           </p>
           <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
             <span className="truncate font-medium">{book.pageCount} pages</span>
+            {book.stats && (
+              <div className="flex items-center space-x-2">
+                <div className="flex items-center space-x-1">
+                  <Heart className="h-3 w-3" />
+                  <span>{book.stats.likes}</span>
+                </div>
+                <div className="flex items-center space-x-1">
+                  <Users className="h-3 w-3" />
+                  <span>{book.stats.views}</span>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>

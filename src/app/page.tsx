@@ -105,7 +105,7 @@ export default function HomePage() {
               style={{ borderColor: 'rgba(217, 119, 6, 0.1)' }}
             >
               <p className="text-base md:text-lg text-slate-800 dark:text-amber-50 leading-relaxed max-w-2xl mx-auto">
-                A living archive born from the collective imagination. Each query conjures phantom volumes, existing only in the space between dream and ink.
+                A living archive born from the collective imagination. This library is been generated while you are searching in it.
               </p>
             </div>
           </div>

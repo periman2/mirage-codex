@@ -17,7 +17,7 @@ export async function GET(
 
     const supabase = await createSupabaseServerClient()
 
-    // Get book details with author, sections, genre, and edition information
+    // Get book details with author, sections, genre, edition, and stats information
     const { data: book, error: bookError } = await supabase
       .from('books')
       .select(`
@@ -43,6 +43,10 @@ export async function GET(
           id,
           slug,
           label
+        ),
+        book_stats (
+          likes_cnt,
+          views_cnt
         )
       `)
       .eq('id', bookId)
@@ -128,6 +132,10 @@ export async function GET(
         id: edition.id,
         modelId: edition.model_id,
         modelName: `${edition.models.model_domains.label} - ${edition.models.name}`
+      },
+      stats: {
+        likes: book.book_stats?.likes_cnt || 0,
+        views: book.book_stats?.views_cnt || 0
       }
     }
 

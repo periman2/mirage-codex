@@ -55,9 +55,9 @@ const transformBookToSearchResult = (book: BookWithRelations) => {
     coverUrl: book.cover_url,
     bookCoverPrompt: book.book_cover_prompt,
     author: {
-      id: book.authors.id,
-      penName: book.authors.pen_name,
-      bio: book.authors.bio
+      id: book?.authors?.id,
+      penName: book?.authors?.pen_name,
+      bio: book?.authors?.bio
     },
     language: book.languages.label,
     sections: [], // We don't need sections for the browse cards
@@ -85,7 +85,7 @@ export function BookSection({
   const { data, isLoading, hasNextPage, fetchNextPage, isFetchingNextPage } = queryResult
   
   // Flatten all pages into a single array
-  const allBooks = (data?.pages?.flat() || []) as BookWithRelations[]
+  const allBooks = (data?.pages?.flat() || []) as any[]
 
   const checkScrollButtons = useCallback(() => {
     if (scrollContainerRef.current) {
@@ -226,9 +226,9 @@ export function BookSection({
           style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
           onScroll={checkScrollButtons}
         >
-          {allBooks.map((book: BookWithRelations, index: number) => (
+          {allBooks.map((book: any, index: number) => (
             <div key={`${book.id}-${index}`} className="flex-none w-48">
-              <BookSearchResultCard book={transformBookToSearchResult(book)} />
+              <BookSearchResultCard book={book} />
             </div>
           ))}
           

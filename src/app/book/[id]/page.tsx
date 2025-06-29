@@ -10,9 +10,10 @@ import { Card } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { ChevronLeft, ChevronRight, Bookmark, BookmarkMinus, Share2, Book, Eye, List } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Bookmark, BookmarkMinus, Share2, Book, Eye, List, Heart, Users } from 'lucide-react'
 import { toast } from 'sonner'
 import Markdown from 'react-markdown'
+import { useBookStats, useBookLike, useBookView, usePageStats, usePageLike, usePageView } from '@/hooks/useBookStats'
 
 interface BookData {
   id: string
@@ -42,6 +43,10 @@ interface BookData {
     modelId: number
     modelName: string
   }
+  stats: {
+    likes: number
+    views: number
+  }
 }
 
 export default function BookDetailPage() {
@@ -70,8 +75,20 @@ export default function BookDetailPage() {
   const [allBookmarks, setAllBookmarks] = useState<Array<{ id: number, page_number: number, note: string | null, created_at: string | null }>>([])
   const [bookmarksLoading, setBookmarksLoading] = useState(false)
   
+  // Optimistic UI state
+  const [optimisticBookLike, setOptimisticBookLike] = useState<{ liked: boolean; count: number } | null>(null)
+  const [optimisticPageLike, setOptimisticPageLike] = useState<{ liked: boolean; count: number } | null>(null)
+  
   // Ref to prevent duplicate generation requests
   const generationInProgress = useRef(false)
+
+  // Stats hooks
+  const { data: bookStats, refetch: refetchBookStats } = useBookStats(bookId)
+  const bookLikeMutation = useBookLike(bookId)
+  const { trackView: trackBookView } = useBookView(bookId)
+  const { data: pageStats } = usePageStats(bookId, currentPage, book?.edition.id)
+  const pageLikeMutation = usePageLike(bookId, currentPage)
+  const { trackView: trackPageView } = usePageView(bookId, currentPage)
 
   // useChat hook for proper streaming
   const { messages, append, status: chatStatus } = useChat({
@@ -197,6 +214,20 @@ export default function BookDetailPage() {
       loadAllBookmarks()
     }
   }, [user?.id, book?.edition.id])
+
+  // Track book view when book loads
+  useEffect(() => {
+    if (book) {
+      trackBookView()
+    }
+  }, [book?.id])
+
+  // Track page view when page changes
+  useEffect(() => {
+    if (book?.edition.id) {
+      trackPageView(book.edition.id)
+    }
+  }, [book?.edition.id, currentPage])
 
   // Load page content
   useEffect(() => {
@@ -411,6 +442,66 @@ export default function BookDetailPage() {
     loadAllBookmarks()
   }
 
+  // Handle book like/unlike with optimistic updates
+  const handleBookLike = async () => {
+    if (!user) {
+      toast.error('Please sign in to like books')
+      return
+    }
+
+    // Optimistic update
+    const currentLiked = optimisticBookLike?.liked ?? bookStats?.userLiked ?? false
+    const currentCount = optimisticBookLike?.count ?? bookStats?.likes ?? book?.stats?.likes ?? 0
+    const newLiked = !currentLiked
+    const newCount = newLiked ? currentCount + 1 : Math.max(0, currentCount - 1)
+    
+    setOptimisticBookLike({ liked: newLiked, count: newCount })
+
+    try {
+      await bookLikeMutation.mutateAsync()
+      // Clear optimistic state when mutation succeeds - let real data take over
+      setOptimisticBookLike(null)
+      refetchBookStats()
+    } catch (error) {
+      // Revert optimistic update on error
+      setOptimisticBookLike(null)
+      console.error('Failed to toggle book like:', error)
+      toast.error('Failed to update like')
+    }
+  }
+
+  // Handle page like/unlike with optimistic updates
+  const handlePageLike = async () => {
+    if (!user) {
+      toast.error('Please sign in to like pages')
+      return
+    }
+
+    if (!book?.edition.id) {
+      toast.error('Edition ID not available')
+      return
+    }
+
+    // Optimistic update
+    const currentLiked = optimisticPageLike?.liked ?? pageStats?.userLiked ?? false
+    const currentCount = optimisticPageLike?.count ?? pageStats?.likes ?? 0
+    const newLiked = !currentLiked
+    const newCount = newLiked ? currentCount + 1 : Math.max(0, currentCount - 1)
+    
+    setOptimisticPageLike({ liked: newLiked, count: newCount })
+
+    try {
+      await pageLikeMutation.mutateAsync(book.edition.id)
+      // Clear optimistic state when mutation succeeds
+      setOptimisticPageLike(null)
+    } catch (error) {
+      // Revert optimistic update on error
+      setOptimisticPageLike(null)
+      console.error('Failed to toggle page like:', error)
+      toast.error('Failed to update like')
+    }
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-mirage-gradient flex items-center justify-center">
@@ -505,6 +596,31 @@ export default function BookDetailPage() {
                       {book.genre.label}
                     </span>
                   </p>
+                  {/* Book Stats with Like Button */}
+                  <div className="flex items-center space-x-4 pt-2">
+                    <div className="flex items-center space-x-1 text-sm text-mirage-text-muted">
+                      {user ? (
+                        <button
+                          onClick={handleBookLike}
+                          disabled={bookLikeMutation.isPending}
+                          className="flex items-center space-x-1 hover:text-red-500 transition-colors cursor-pointer"
+                          title={`${optimisticBookLike?.liked ?? bookStats?.userLiked ? 'Unlike' : 'Like'} this book`}
+                        >
+                          <Heart className={`h-4 w-4 ${optimisticBookLike?.liked ?? bookStats?.userLiked ? 'fill-red-500 text-red-500' : ''}`} />
+                          <span>{optimisticBookLike?.count ?? bookStats?.likes ?? book.stats?.likes ?? 0}</span>
+                        </button>
+                      ) : (
+                        <div className="flex items-center space-x-1">
+                          <Heart className="h-4 w-4" />
+                          <span>{bookStats?.likes || book.stats?.likes || 0}</span>
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex items-center space-x-1 text-sm text-mirage-text-muted">
+                      <Users className="h-4 w-4" />
+                      <span>{bookStats?.views || book.stats?.views || 0}</span>
+                    </div>
+                  </div>
                 </div>
                 <p className="text-sm text-mirage-text-muted">
                   Generated with {book.edition.modelName}
@@ -516,16 +632,6 @@ export default function BookDetailPage() {
                 <div className="bg-mirage-bg-tertiary/50 rounded-lg p-4 space-y-3">
                   <div className="flex items-center justify-between">
                     <h3 className="text-base font-semibold text-mirage-text-primary">Summary</h3>
-                    <DialogTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-6 w-6 p-0"
-                        style={{ color: 'rgb(217 119 6)' }}
-                      >
-                        <Eye className="h-4 w-4" style={{ color: 'rgb(217 119 6)' }} />
-                      </Button>
-                    </DialogTrigger>
                   </div>
                   <DialogTrigger asChild>
                     <div className="cursor-pointer">
@@ -557,110 +663,9 @@ export default function BookDetailPage() {
                 </DialogContent>
               </Dialog>
 
-              {/* Page Info */}
-              <div className="text-center">
-                <span className="text-base text-mirage-text-tertiary font-medium">
-                  Page {currentPage} of {book.pageCount}
-                </span>
-              </div>
-
               {/* Action Buttons */}
               <div className="space-y-3">
-                {/* Bookmark Button */}
-                {user ? (
-                  <Dialog open={isBookmarkDialogOpen} onOpenChange={setIsBookmarkDialogOpen}>
-                    <Button
-                      variant={existingBookmark ? "default" : "outline"}
-                      size="default"
-                      className="w-full flex items-center gap-2 h-10"
-                      style={existingBookmark ? {
-                        backgroundColor: 'rgb(217 119 6)',
-                        borderColor: 'rgb(217 119 6)',
-                        color: 'white'
-                      } : {}}
-                      onClick={handleBookmark}
-                      title={existingBookmark?.note ? `Note: ${existingBookmark.note}` : undefined}
-                    >
-                      {existingBookmark ? (
-                        <>
-                          <BookmarkMinus className="h-4 w-4" />
-                          Remove Bookmark
-                          {existingBookmark.note && (
-                            <span className="text-xs bg-mirage-border-primary text-mirage-text-secondary px-1 py-0.5 rounded ml-1">
-                              📝
-                            </span>
-                          )}
-                        </>
-                      ) : (
-                        <>
-                          <Bookmark className="h-4 w-4" />
-                          Add Bookmark
-                        </>
-                      )}
-                    </Button>
-
-                    <DialogContent className="max-w-md bg-white/95 backdrop-blur-md border border-mirage-border-primary shadow-xl">
-                      <DialogHeader>
-                        <DialogTitle className="text-lg font-bold text-mirage-text-primary">
-                          Add Bookmark
-                        </DialogTitle>
-                      </DialogHeader>
-                      <div className="space-y-4 mt-4">
-                        <div>
-                          <p className="text-sm text-mirage-text-secondary mb-3">
-                            Bookmarking page {currentPage} of "{book?.title}"
-                          </p>
-                          <Label htmlFor="bookmark-note" className="text-sm font-medium text-mirage-text-primary">
-                            Note (optional)
-                          </Label>
-                          <Input
-                            id="bookmark-note"
-                            value={bookmarkNote}
-                            onChange={(e) => setBookmarkNote(e.target.value)}
-                            placeholder="Add a note about this page..."
-                            className="mt-1 bg-white/90 border-mirage-border-primary"
-                            maxLength={500}
-                          />
-                          <p className="text-xs text-mirage-text-muted/70 mt-1">
-                            {bookmarkNote.length}/500 characters
-                          </p>
-                        </div>
-                        <div className="flex space-x-2 pt-2">
-                          <Button
-                            onClick={() => setIsBookmarkDialogOpen(false)}
-                            variant="outline"
-                            className="flex-1"
-                          >
-                            Cancel
-                          </Button>
-                          <Button
-                            onClick={createBookmark}
-                            className="flex-1"
-                            style={{
-                              backgroundColor: 'rgb(217 119 6)',
-                              borderColor: 'rgb(217 119 6)',
-                              color: 'white'
-                            }}
-                          >
-                            Save Bookmark
-                          </Button>
-                        </div>
-                      </div>
-                    </DialogContent>
-                  </Dialog>
-                ) : (
-                  <Button
-                    variant="outline"
-                    size="default"
-                    className="w-full flex items-center gap-2 h-10 opacity-50 cursor-not-allowed"
-                    disabled
-                  >
-                    <Bookmark className="h-4 w-4" />
-                    Sign in to Bookmark
-                  </Button>
-                )}
-
-
+                {/* View Bookmarks Button */}
                 {user ? (
                   <Button
                     variant="outline"
@@ -681,21 +686,18 @@ export default function BookDetailPage() {
                     <List className="h-4 w-4" />
                     Sign in for Bookmarks
                   </Button>
-                )}
+                                  )}
+                </div>
 
-                <Button
-                  variant="outline"
-                  size="default"
-                  className="w-full flex items-center gap-2 h-10"
-                  onClick={handleShare}
-                >
-                  <Share2 className="h-4 w-4" />
-                  Share Page
-                </Button>
+                {/* Page Info */}
+                <div className="text-center">
+                  <span className="text-base text-mirage-text-tertiary font-medium">
+                    Page {currentPage} of {book.pageCount}
+                  </span>
+                </div>
               </div>
             </div>
           </div>
-        </div>
 
         {/* Main Content - Page Content */}
         <div className="flex-1 p-4 md:p-4 pt-16 md:pt-4 flex flex-col">
@@ -705,18 +707,59 @@ export default function BookDetailPage() {
               <div className="px-4 py-3 md:px-6 md:py-4 border-b border-mirage-border-primary bg-white/90">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <h2 className="text-sm md:text-lg font-semibold text-mirage-text-primary">
-                      Page {currentPage} of {book?.pageCount}
-                    </h2>
-                    {existingBookmark && (
-                      <span
-                        style={{ color: 'rgb(217 119 6)' }}
-                        className="transition-colors cursor-pointer"
-                        title={existingBookmark.note ? `Bookmarked: ${existingBookmark.note}` : 'Bookmarked'}
+                    
+                    {/* Page stats and actions */}
+                    <div className="flex items-center gap-3">
+                      {/* Page Like Button */}
+                      {user ? (
+                        <button
+                          onClick={handlePageLike}
+                          disabled={pageLikeMutation.isPending}
+                          className="flex items-center space-x-1 hover:text-red-500 transition-colors text-sm text-mirage-text-muted cursor-pointer"
+                          title={`${optimisticPageLike?.liked ?? pageStats?.userLiked ? 'Unlike' : 'Like'} this page`}
+                        >
+                          <Heart className={`h-4 w-4 ${optimisticPageLike?.liked ?? pageStats?.userLiked ? 'fill-red-500 text-red-500' : ''}`} />
+                          <span>{optimisticPageLike?.count ?? pageStats?.likes ?? 0}</span>
+                        </button>
+                      ) : (
+                        <div className="flex items-center space-x-1 text-sm text-mirage-text-muted">
+                          <Heart className="h-4 w-4" />
+                          <span>{pageStats?.likes ?? 0}</span>
+                        </div>
+                      )}
+                      
+                      {/* Page Views */}
+                      <div className="flex items-center space-x-1 text-sm text-mirage-text-muted">
+                        <Eye className="h-4 w-4" />
+                        <span>{pageStats?.views ?? 0}</span>
+                      </div>
+                      
+                      {/* Bookmark Button */}
+                      {user ? (
+                        <button
+                          onClick={handleBookmark}
+                          className="hover:scale-110 transition-transform cursor-pointer"
+                          title={existingBookmark ? (existingBookmark.note ? `Bookmarked: ${existingBookmark.note}` : 'Remove bookmark') : 'Add bookmark'}
+                        >
+                          {existingBookmark ? (
+                            <Bookmark className="h-4 w-4 fill-current" style={{ color: 'rgb(217 119 6)' }} />
+                          ) : (
+                            <Bookmark className="h-4 w-4 text-mirage-text-muted hover:text-amber-600 transition-colors" />
+                          )}
+                        </button>
+                      ) : (
+                        <Bookmark className="h-4 w-4 text-mirage-text-muted opacity-50" />
+                      )}
+                      
+                      {/* Share Button */}
+                      <button
+                        onClick={handleShare}
+                        className="hover:scale-110 transition-transform cursor-pointer"
+                        title="Share this page"
                       >
-                        <Bookmark className="h-4 w-4 fill-current" style={{ color: 'rgb(217 119 6)' }} />
-                      </span>
-                    )}
+                        <Share2 className="h-4 w-4 text-mirage-text-muted hover:text-amber-600 transition-colors" />
+                      </button>
+                    </div>
                   </div>
                   <div className="flex space-x-2 md:space-x-3">
                     <Button
@@ -832,6 +875,58 @@ export default function BookDetailPage() {
 
         </div>
       </div>
+
+      {/* Bookmark Dialog */}
+      <Dialog open={isBookmarkDialogOpen} onOpenChange={setIsBookmarkDialogOpen}>
+        <DialogContent className="max-w-md bg-white/95 backdrop-blur-md border border-mirage-border-primary shadow-xl">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-bold text-mirage-text-primary">
+              Add Bookmark
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 mt-4">
+            <div>
+              <p className="text-sm text-mirage-text-secondary mb-3">
+                Bookmarking page {currentPage} of "{book?.title}"
+              </p>
+              <Label htmlFor="bookmark-note" className="text-sm font-medium text-mirage-text-primary">
+                Note (optional)
+              </Label>
+              <Input
+                id="bookmark-note"
+                value={bookmarkNote}
+                onChange={(e) => setBookmarkNote(e.target.value)}
+                placeholder="Add a note about this page..."
+                className="mt-1 bg-white/90 border-mirage-border-primary"
+                maxLength={500}
+              />
+              <p className="text-xs text-mirage-text-muted/70 mt-1">
+                {bookmarkNote.length}/500 characters
+              </p>
+            </div>
+            <div className="flex space-x-2 pt-2">
+              <Button
+                onClick={() => setIsBookmarkDialogOpen(false)}
+                variant="outline"
+                className="flex-1"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={createBookmark}
+                className="flex-1"
+                style={{
+                  backgroundColor: 'rgb(217 119 6)',
+                  borderColor: 'rgb(217 119 6)',
+                  color: 'white'
+                }}
+              >
+                Save Bookmark
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Bookmarks List Modal */}
       <Dialog open={isBookmarksListOpen} onOpenChange={setIsBookmarksListOpen}>

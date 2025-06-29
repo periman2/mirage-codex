@@ -98,6 +98,38 @@ export type Database = {
           },
         ]
       }
+      book_reactions: {
+        Row: {
+          book_id: string
+          created_at: string
+          id: number
+          reaction_type: string
+          user_id: string
+        }
+        Insert: {
+          book_id: string
+          created_at?: string
+          id?: number
+          reaction_type?: string
+          user_id: string
+        }
+        Update: {
+          book_id?: string
+          created_at?: string
+          id?: number
+          reaction_type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "book_reactions_book_id_fkey"
+            columns: ["book_id"]
+            isOneToOne: false
+            referencedRelation: "books"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       book_sections: {
         Row: {
           book_id: string
@@ -132,6 +164,73 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "book_sections_book_id_fkey"
+            columns: ["book_id"]
+            isOneToOne: false
+            referencedRelation: "books"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      book_stats: {
+        Row: {
+          book_id: string
+          likes_cnt: number
+          updated_at: string
+          views_cnt: number
+        }
+        Insert: {
+          book_id: string
+          likes_cnt?: number
+          updated_at?: string
+          views_cnt?: number
+        }
+        Update: {
+          book_id?: string
+          likes_cnt?: number
+          updated_at?: string
+          views_cnt?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "book_stats_book_id_fkey"
+            columns: ["book_id"]
+            isOneToOne: true
+            referencedRelation: "books"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      book_view_events: {
+        Row: {
+          book_id: string
+          created_at: string
+          id: number
+          ip_address: unknown | null
+          session_id: string | null
+          user_agent: string | null
+          user_id: string | null
+        }
+        Insert: {
+          book_id: string
+          created_at?: string
+          id?: number
+          ip_address?: unknown | null
+          session_id?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          book_id?: string
+          created_at?: string
+          id?: number
+          ip_address?: unknown | null
+          session_id?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "book_view_events_book_id_fkey"
             columns: ["book_id"]
             isOneToOne: false
             referencedRelation: "books"
@@ -421,6 +520,105 @@ export type Database = {
           },
         ]
       }
+      page_reactions: {
+        Row: {
+          created_at: string
+          id: number
+          page_id: number
+          reaction_type: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: number
+          page_id: number
+          reaction_type?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: number
+          page_id?: number
+          reaction_type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "page_reactions_page_id_fkey"
+            columns: ["page_id"]
+            isOneToOne: false
+            referencedRelation: "book_pages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      page_stats: {
+        Row: {
+          likes_cnt: number
+          page_id: number
+          updated_at: string
+          views_cnt: number
+        }
+        Insert: {
+          likes_cnt?: number
+          page_id: number
+          updated_at?: string
+          views_cnt?: number
+        }
+        Update: {
+          likes_cnt?: number
+          page_id?: number
+          updated_at?: string
+          views_cnt?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "page_stats_page_id_fkey"
+            columns: ["page_id"]
+            isOneToOne: true
+            referencedRelation: "book_pages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      page_view_events: {
+        Row: {
+          created_at: string
+          id: number
+          ip_address: unknown | null
+          page_id: number
+          session_id: string | null
+          user_agent: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: number
+          ip_address?: unknown | null
+          page_id: number
+          session_id?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: number
+          ip_address?: unknown | null
+          page_id?: number
+          session_id?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "page_view_events_page_id_fkey"
+            columns: ["page_id"]
+            isOneToOne: false
+            referencedRelation: "book_pages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -506,89 +704,6 @@ export type Database = {
             columns: ["search_id"]
             isOneToOne: true
             referencedRelation: "searches"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      search_results: {
-        Row: {
-          author_bio: string | null
-          author_id: string
-          author_pen_name: string
-          author_style_prompt: string | null
-          book_cover_url: string | null
-          book_id: string
-          book_page_count: number
-          book_sections: Json
-          book_summary: string
-          book_title: string
-          created_at: string | null
-          free_text: string | null
-          genre_slug: string
-          hash: string
-          id: string
-          language_code: string
-          model_id: number
-          page_number: number
-          page_size: number
-          rank: number
-          tag_slugs: string[] | null
-          user_id: string
-        }
-        Insert: {
-          author_bio?: string | null
-          author_id: string
-          author_pen_name: string
-          author_style_prompt?: string | null
-          book_cover_url?: string | null
-          book_id: string
-          book_page_count: number
-          book_sections: Json
-          book_summary: string
-          book_title: string
-          created_at?: string | null
-          free_text?: string | null
-          genre_slug: string
-          hash: string
-          id?: string
-          language_code: string
-          model_id: number
-          page_number?: number
-          page_size?: number
-          rank: number
-          tag_slugs?: string[] | null
-          user_id: string
-        }
-        Update: {
-          author_bio?: string | null
-          author_id?: string
-          author_pen_name?: string
-          author_style_prompt?: string | null
-          book_cover_url?: string | null
-          book_id?: string
-          book_page_count?: number
-          book_sections?: Json
-          book_summary?: string
-          book_title?: string
-          created_at?: string | null
-          free_text?: string | null
-          genre_slug?: string
-          hash?: string
-          id?: string
-          language_code?: string
-          model_id?: number
-          page_number?: number
-          page_size?: number
-          rank?: number
-          tag_slugs?: string[] | null
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "search_results_model_id_fkey"
-            columns: ["model_id"]
-            isOneToOne: false
-            referencedRelation: "models"
             referencedColumns: ["id"]
           },
         ]
@@ -813,19 +928,47 @@ export type Database = {
           model_name: string
         }[]
       }
+      recalculate_book_likes: {
+        Args: Record<PropertyKey, never>
+        Returns: number
+      }
+      recalculate_page_likes: {
+        Args: Record<PropertyKey, never>
+        Returns: number
+      }
       save_search_results: {
-        Args: {
-          p_hash: string
-          p_user_id: string
-          p_free_text: string
-          p_language_code: string
-          p_genre_slug: string
-          p_tag_slugs: string[]
-          p_model_id: number
-          p_page_number: number
-          p_page_size: number
-          p_books: Json
-        }
+        Args:
+          | {
+              p_hash: string
+              p_user_id: string
+              p_free_text: string
+              p_language_code: string
+              p_genre_slug: string
+              p_tag_slugs: string[]
+              p_model_id: number
+              p_page_number: number
+              p_page_size: number
+              p_books: Json
+            }
+          | {
+              p_hash: string
+              p_user_id: string
+              p_language_code: string
+              p_genre_slug: string
+              p_tag_slugs: string[]
+              p_free_text: string
+              p_model_id: string
+              p_books: Json
+              p_page_number?: number
+            }
+        Returns: Json
+      }
+      toggle_book_like: {
+        Args: { p_user_id: string; p_book_id: string }
+        Returns: Json
+      }
+      toggle_page_like: {
+        Args: { p_user_id: string; p_page_id: number }
         Returns: Json
       }
     }

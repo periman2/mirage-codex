@@ -132,7 +132,7 @@ export default function GenrePage({ params }: GenrePageProps) {
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-4">
                   {allBooks.map((book: any, index: number) => (
                     <div key={`${book.id}-${index}`}>
-                      <BookSearchResultCard book={transformBookToSearchResult(book)} />
+                      <BookSearchResultCard book={book} />
                     </div>
                   ))}
                 </div>
@@ -170,29 +170,7 @@ export default function GenrePage({ params }: GenrePageProps) {
   )
 }
 
-// Helper function to transform book data
-const transformBookToSearchResult = (book: any) => {
-  return {
-    id: book.id,
-    title: book.title,
-    summary: book.summary,
-    pageCount: book.page_count,
-    coverUrl: book.cover_url,
-    bookCoverPrompt: book.book_cover_prompt,
-    author: {
-      id: book.authors.id,
-      penName: book.authors.pen_name,
-      bio: book.authors.bio
-    },
-    language: book.languages.label,
-    sections: [], // Not used in this context
-    edition: {
-      id: book.editions[0]?.id || '',
-      modelId: book.editions[0]?.model_id || 0,
-      modelName: book.editions[0]?.models?.name || ''
-    }
-  }
-}
+
 
 // Loading skeleton for the book grid
 function BookGridSkeleton() {

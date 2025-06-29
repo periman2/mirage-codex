@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from '@tanstack/react-query'
 import { createSupabaseBrowserClient } from './supabase'
 import type { Tables } from './database.types'
+import { transformBookWithStats } from './book-transform'
 
 // Query keys factory
 export const queryKeys = {
@@ -208,6 +209,10 @@ export function useBooks(filters: {
             id,
             slug,
             label
+          ),
+          book_stats (
+            likes_cnt,
+            views_cnt
           )
         `)
         .range(from, to)
@@ -229,7 +234,7 @@ export function useBooks(filters: {
       const { data, error } = await query
       
       if (error) throw error
-      return data || []
+      return (data || []).map(transformBookWithStats).filter(Boolean)
     },
     getNextPageParam: (lastPage, allPages) => {
       return lastPage.length === 20 ? allPages.length : undefined
@@ -289,6 +294,10 @@ export function useUserSearchedBooks(userId: string, limit: number = 10) {
                 id,
                 name
               )
+            ),
+            book_stats (
+              likes_cnt,
+              views_cnt
             )
           )
         `)
@@ -303,7 +312,7 @@ export function useUserSearchedBooks(userId: string, limit: number = 10) {
         index === self.findIndex(b => b?.id === book?.id)
       )
       
-      return uniqueBooks
+      return uniqueBooks.map(transformBookWithStats).filter(Boolean)
     },
     getNextPageParam: (lastPage, allPages) => {
       return lastPage.length === limit ? allPages.length : undefined
@@ -351,13 +360,17 @@ export function useLatestBooks(limit: number = 10) {
               id,
               name
             )
+          ),
+          book_stats (
+            likes_cnt,
+            views_cnt
           )
         `)
         .order('created_at', { ascending: false })
         .range(from, to)
       
       if (error) throw error
-      return data || []
+      return (data || []).map(transformBookWithStats).filter(Boolean)
     },
     getNextPageParam: (lastPage, allPages) => {
       return lastPage.length === limit ? allPages.length : undefined
@@ -404,6 +417,10 @@ export function useBooksByGenre(genreSlug: string, limit: number = 10) {
               id,
               name
             )
+          ),
+          book_stats (
+            likes_cnt,
+            views_cnt
           )
         `)
         .eq('genres.slug', genreSlug)
@@ -411,7 +428,7 @@ export function useBooksByGenre(genreSlug: string, limit: number = 10) {
         .range(from, to)
       
       if (error) throw error
-      return data || []
+      return (data || []).map(transformBookWithStats).filter(Boolean)
     },
     getNextPageParam: (lastPage, allPages) => {
       return lastPage.length === limit ? allPages.length : undefined
