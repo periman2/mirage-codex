@@ -412,31 +412,40 @@ export type Database = {
       }
       genres: {
         Row: {
+          book_format_prompt: string | null
           created_at: string | null
           id: string
           is_active: boolean | null
           label: string
+          model_temperature: number | null
           order_index: number
           prompt_boost: string | null
           slug: string
+          tokens_per_page: number | null
         }
         Insert: {
+          book_format_prompt?: string | null
           created_at?: string | null
           id?: string
           is_active?: boolean | null
           label: string
+          model_temperature?: number | null
           order_index?: number
           prompt_boost?: string | null
           slug: string
+          tokens_per_page?: number | null
         }
         Update: {
+          book_format_prompt?: string | null
           created_at?: string | null
           id?: string
           is_active?: boolean | null
           label?: string
+          model_temperature?: number | null
           order_index?: number
           prompt_boost?: string | null
           slug?: string
+          tokens_per_page?: number | null
         }
         Relationships: []
       }

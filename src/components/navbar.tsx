@@ -39,9 +39,10 @@ export function Navbar() {
         border-b border-amber-200/30 dark:border-amber-200/40 
         sticky top-0 z-50 
         transition-all duration-300 ease-out
+        shadow-sm
         ${isScrolled 
-          ? 'bg-white/90 dark:bg-amber-950/90 backdrop-blur-md shadow-sm' 
-          : 'bg-transparent'
+          ? 'bg-white/90 dark:bg-amber-950/90 backdrop-blur-md shadow-md' 
+          : 'bg-white/80 dark:bg-amber-950/80 backdrop-blur-sm'
         }
         h-16
       `}>

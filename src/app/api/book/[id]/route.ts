@@ -77,8 +77,8 @@ export async function GET(
       )
     }
 
-    // Get edition information (first available edition for this book)
-    const { data: edition, error: editionError } = await supabase
+    // Get all editions for this book
+    const { data: editions, error: editionsError } = await supabase
       .from('editions')
       .select(`
         id,
@@ -91,13 +91,12 @@ export async function GET(
         )
       `)
       .eq('book_id', bookId)
-      .limit(1)
-      .single()
+      .order('created_at', { ascending: true }) // First edition will be the default
 
-    if (editionError) {
-      console.error('❌ Failed to get edition:', editionError)
+    if (editionsError || !editions || editions.length === 0) {
+      console.error('❌ Failed to get editions:', editionsError)
       return NextResponse.json(
-        { error: 'Failed to get book edition' },
+        { error: 'Failed to get book editions' },
         { status: 500 }
       )
     }
@@ -128,11 +127,11 @@ export async function GET(
         toPage: section.to_page,
         summary: section.summary
       })) || [],
-      edition: {
+      editions: editions.map(edition => ({
         id: edition.id,
         modelId: edition.model_id,
         modelName: `${edition.models.model_domains.label} - ${edition.models.name}`
-      },
+      })),
       stats: {
         likes: book.book_stats?.likes_cnt || 0,
         views: book.book_stats?.views_cnt || 0

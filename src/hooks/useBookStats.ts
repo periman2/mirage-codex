@@ -14,11 +14,12 @@ interface ViewTrackingData {
 }
 
 // Hook for getting book stats
-export function useBookStats(bookId: string) {
+export function useBookStats(bookId: string, enabled: boolean) {
   const supabase = createSupabaseBrowserClient()
 
   return useQuery<BookStats>({
     queryKey: ['book-stats', bookId],
+    enabled: !!bookId && enabled,
     queryFn: async () => {
       const { data: { session } } = await supabase.auth.getSession()
       const headers: Record<string, string> = {}
@@ -119,7 +120,7 @@ export function useBookView(bookId: string) {
 }
 
 // Hook for getting page stats
-export function usePageStats(bookId: string, pageNumber: number, editionId?: string) {
+export function usePageStats(bookId: string, pageNumber: number, editionId: string | undefined, enabled: boolean) {
   const supabase = createSupabaseBrowserClient()
 
   return useQuery<BookStats>({
@@ -147,7 +148,7 @@ export function usePageStats(bookId: string, pageNumber: number, editionId?: str
 
       return response.json()
     },
-    enabled: !!editionId,
+    enabled: !!editionId && enabled,
     staleTime: 1 * 60 * 1000, // 1 minute
     refetchOnWindowFocus: false
   })
@@ -230,4 +231,98 @@ export function usePageView(bookId: string, pageNumber: number) {
   }
 
   return { trackView, hasTrackedView }
-} 
+}
+
+// Hook for loading page content
+export function usePageContent(
+  bookId: string, 
+  pageNumber: number, 
+  editionId: string | undefined, 
+  enabled: boolean,
+  onSuccess?: (data: { exists: boolean; content: string | null }) => void,
+  onError?: (error: Error) => void
+) {
+  return useQuery<{ exists: boolean; content: string | null }>({
+    queryKey: ['page-content', bookId, pageNumber, editionId],
+    queryFn: async () => {
+      try {
+        console.log('🔄 usePageContent queryFn running', { bookId, pageNumber, editionId });
+        
+        if (!editionId) {
+          throw new Error('Edition ID required for page content')
+        }
+
+        const response = await fetch(
+          `/api/book/${bookId}/page/${pageNumber}?editionId=${editionId}`
+        )
+
+        if (!response.ok) {
+          throw new Error('Failed to load page content')
+        }
+
+        const data = await response.json();
+        console.log('✅ usePageContent queryFn success', data);
+        
+        // Call success callback if provided
+        if (onSuccess) {
+          try {
+            await onSuccess(data);
+          } catch (callbackError) {
+            console.error('❌ onSuccess callback error:', callbackError);
+          }
+        }
+        
+        return data;
+      } catch (error) {
+        console.error('❌ usePageContent queryFn error:', error);
+        
+        // Call error callback if provided
+        if (onError && error instanceof Error) {
+          try {
+            onError(error);
+          } catch (callbackError) {
+            console.error('❌ onError callback error:', callbackError);
+          }
+        }
+        
+        throw error;
+      }
+    },
+    enabled: !!bookId && !!pageNumber && !!editionId && enabled,
+    staleTime: 0,
+    refetchOnWindowFocus: false,
+    retry: 1 // Only retry once for page content
+  })
+}
+
+// Hook for loading existing bookmark for current page
+export function useBookmark(userId: string | undefined, editionId: string | undefined, pageNumber: number, enabled: boolean) {
+  const supabase = createSupabaseBrowserClient()
+
+  return useQuery<{ id: number; note: string | null } | null>({
+    queryKey: ['bookmark', userId, editionId, pageNumber],
+    queryFn: async () => {
+      if (!userId || !editionId) {
+        return null
+      }
+
+      const { data, error } = await supabase
+        .from('bookmarks')
+        .select('id, note')
+        .eq('user_id', userId)
+        .eq('edition_id', editionId)
+        .eq('page_number', pageNumber)
+        .single()
+
+      if (error && error.code !== 'PGRST116') { // PGRST116 is "not found"
+        console.error('Error loading bookmark:', error)
+        throw error
+      }
+
+      return data || null
+    },
+    enabled: !!userId && !!editionId && !!pageNumber && enabled,
+    staleTime: 0, // 0.5 minute
+    refetchOnWindowFocus: false
+  })
+}

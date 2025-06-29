@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { streamText } from 'ai'
 import { createSupabaseServerClient } from '@/lib/supabase'
 import { getAIProvider } from '@/lib/ai'
+import fs from 'fs'
+import path from 'path'
 
 interface RouteParams {
   params: Promise<{
@@ -10,7 +12,11 @@ interface RouteParams {
   }>
 }
 
-// Allow streaming responses up to 30 seconds
+// Configuration constants
+const CONTEXT_PAGES_COUNT = 20 // Number of previous pages to include for context
+const DEFAULT_TEMPERATURE = 0.8 // Fallback temperature if genre doesn't specify
+
+// Allow streaming responses up to 60 seconds
 export const maxDuration = 60
 
 // GET endpoint to check if page exists
@@ -22,7 +28,7 @@ export async function GET(
     const url = new URL(request.url)
     const editionId = url.searchParams.get('editionId')
     const { pageNumber } = await params
-    
+
     if (!editionId) {
       return NextResponse.json(
         { error: 'Edition ID is required' },
@@ -44,14 +50,14 @@ export async function GET(
 
     if (existingPage) {
       console.log('✅ Page found in cache')
-      return NextResponse.json({ 
+      return NextResponse.json({
         exists: true,
-        content: existingPage.content 
+        content: existingPage.content
       })
     } else {
       console.log('❌ Page not found in cache')
-      return NextResponse.json({ 
-        exists: false 
+      return NextResponse.json({
+        exists: false
       })
     }
 
@@ -71,13 +77,14 @@ export async function POST(
 ) {
   try {
     const { messages, editionId } = await request.json()
+
     const { pageNumber } = await params
-    
+
     console.log('📚 Page generation request:', { editionId, pageNumber })
 
     const supabase = await createSupabaseServerClient()
 
-    // Get edition details including book, author, and model info
+    // Get edition details including book, author, genre, and model info
     const { data: editionDetails, error: editionError } = await supabase
       .from('editions')
       .select(`
@@ -94,6 +101,13 @@ export async function POST(
             pen_name,
             style_prompt,
             bio
+          ),
+          genres (
+            label,
+            slug,
+            book_format_prompt,
+            tokens_per_page,
+            model_temperature
           )
         ),
         models (
@@ -116,53 +130,156 @@ export async function POST(
       )
     }
 
-    // Get previous page content for context (if page > 1)
-    let previousPageContent = ''
-    if (parseInt(pageNumber) > 1) {
-      const { data: previousPage } = await supabase
-        .from('book_pages')
-        .select('content')
-        .eq('edition_id', editionId)
-        .eq('page_number', parseInt(pageNumber) - 1)
-        .single()
+    // Get previous pages content for context (last CONTEXT_PAGES_COUNT pages)
+    let contextPagesContent = ''
+    const currentPageNum = parseInt(pageNumber)
+    if (currentPageNum > 1) {
+      const startPage = Math.max(1, currentPageNum - CONTEXT_PAGES_COUNT)
+      const endPage = currentPageNum - 1
 
-      if (previousPage) {
-        previousPageContent = previousPage.content
+      const { data: contextPages } = await supabase
+        .from('book_pages')
+        .select('page_number, content')
+        .eq('edition_id', editionId)
+        .gte('page_number', startPage)
+        .lte('page_number', endPage)
+        .order('page_number', { ascending: true })
+
+      if (contextPages && contextPages.length > 0) {
+        contextPagesContent = contextPages
+          .map(page => `--- Page ${page.page_number} ---\n${page.content}`)
+          .join('\n\n')
       }
     }
 
     // Get book sections for context
     const { data: sections } = await supabase
       .from('book_sections')
-      .select('title, from_page, to_page, summary')
+      .select('title, from_page, to_page, summary, order_index')
       .eq('book_id', editionDetails.book_id)
       .order('order_index')
 
-    // Find which section this page belongs to
-    const currentSection = sections?.find(section => 
-      parseInt(pageNumber) >= section.from_page && parseInt(pageNumber) <= section.to_page
-    )
+    // Find which section this page belongs to and categorize all sections
+    let currentSection: any = null
+    let currentSectionIndex = -1
+    const pastSections: any[] = []
+    const futureSections: any[] = []
+
+    sections?.forEach((section, index) => {
+      if (currentPageNum >= section.from_page && currentPageNum <= section.to_page) {
+        currentSection = section
+        currentSectionIndex = index
+      } else if (section.to_page < currentPageNum) {
+        pastSections.push(section)
+      } else if (section.from_page > currentPageNum) {
+        futureSections.push(section)
+      }
+    })
+
+    // Calculate progress within current section
+    let sectionProgress = ''
+    if (currentSection) {
+      const sectionLength = currentSection.to_page - currentSection.from_page + 1
+      const pageInSection = currentPageNum - currentSection.from_page + 1
+      const progressPercent = Math.round((pageInSection / sectionLength) * 100)
+      sectionProgress = ` (Page ${pageInSection} of ${sectionLength} pages, ${progressPercent}% through section)`
+    }
 
     // Get AI provider and model
     const aiProvider = await getAIProvider(editionDetails.models.domain_code, editionDetails.models.name)
 
-    // Determine genre-specific formatting
-    const formatInstructions = getFormatInstructions(editionDetails.books.title)
+    // Get genre-specific settings
+    const genre = editionDetails.books.genres
+    const modelTemperature = genre.model_temperature || DEFAULT_TEMPERATURE
+    const tokensPerPage = genre.tokens_per_page || 500
+    const formatInstructions = genre.book_format_prompt || `Format as a narrative page with natural paragraph breaks and proper dialogue formatting.`
 
-    // Build system prompt
-    const systemPrompt = `You are writing page ${pageNumber} of "${editionDetails.books.title}" by ${editionDetails.books.authors.pen_name}.
+    // Build comprehensive system prompt
+    const systemPrompt = `You are the primary book author for the MirageCodex platform, a sophisticated AI-powered book creation system. You are currently writing "${editionDetails.books.title}" in the ${genre.label} genre.
 
-Book Summary: ${editionDetails.books.summary}
+## AUTHOR IDENTITY & STYLE
+You are writing as ${editionDetails.books.authors.pen_name}, and you must embody their unique voice and style throughout.
 
-Author Style: ${editionDetails.books.authors.style_prompt || 'Write in an engaging, narrative style.'}
+**Author Bio:** ${editionDetails.books.authors.bio || 'A skilled author with a distinctive narrative voice.'}
 
-${currentSection ? `Current Section: "${currentSection.title}" - ${currentSection.summary}` : ''}
+**Writing Style Instructions:** ${editionDetails.books.authors.style_prompt || 'Write in an engaging, narrative style that captivates readers.'}
 
-${previousPageContent ? `Previous Page Content:\n${previousPageContent}\n\n` : ''}
+## BOOK CONTEXT
+**Book Title:** "${editionDetails.books.title}"
+**Genre:** ${genre.label}
+**Total Pages:** ${editionDetails.books.page_count}
+**Current Page:** ${pageNumber}
+**Language:** ${editionDetails.languages.label}
 
+**Book Summary:** ${editionDetails.books.summary}
+
+## BOOK STRUCTURE & CONTENT ORGANIZATION
+${sections && sections.length > 0 ? `
+This book is organized into ${sections.length} sections. Here's the complete structure:
+
+${pastSections.length > 0 ? `**COMPLETED SECTIONS:**
+${pastSections.map((section, idx) => `${idx + 1}. "${section.title}" (Pages ${section.from_page}-${section.to_page})
+   Content: ${section.summary}`).join('\n')}
+
+` : ''}${currentSection ? `**CURRENT SECTION:** "${currentSection.title}" (Pages ${currentSection.from_page}-${currentSection.to_page})${sectionProgress}  
+   Content: ${currentSection.summary}
+   
+   You are currently writing within this section. Consider how this page fits within the section's content flow and development.
+
+` : ''}${futureSections.length > 0 ? `**UPCOMING SECTIONS:**
+${futureSections.map((section, idx) => `${pastSections.length + (currentSection ? 2 : 1) + idx}. "${section.title}" (Pages ${section.from_page}-${section.to_page})
+   Content: ${section.summary}`).join('\n')}
+
+   Keep these upcoming topics in mind for appropriate transitions and content continuity.` : ''}
+` : 'No section structure defined for this book.'}
+
+## PREVIOUS CONTEXT
+${contextPagesContent ? `Here are the previous pages for context:\n\n${contextPagesContent}\n\n` : 'This is the beginning of the book.'}
+
+## FORMATTING & STYLE GUIDELINES
+DO NOT INCLUDE PAGE NUMBER IN THE CONTENT OF THE PAGE.
+DO NOT INCLUDE AUTHOR NAME IN THE CONTENT OF THE PAGE.
+DO NOT INCLUDE BOOK TITLE IN THE CONTENT OF THE PAGE.
+DO NOT INCLUDE SECTION TITLE IN THE CONTENT OF THE PAGE.
+DO NOT REPEAT THE SAME EXACT CONTENT FROM THE PREVIOUS PAGES.
 ${formatInstructions}
 
-Write page ${pageNumber} of ${editionDetails.books.page_count}. Make it engaging and continue the narrative naturally.`
+## PAGE LENGTH GUIDANCE
+Aim for approximately ${tokensPerPage} words for this page. This should provide the right pacing and depth for the ${genre.label} genre.
+
+## IMAGE GENERATION INSTRUCTIONS
+If the content, genre, or narrative context calls for a visual element, you may include images using this exact format:
+[p=simple one sentence description of the image in lowercase with no special characters]
+
+Example: [p=a mysterious castle silhouetted against a stormy sky]
+Example: [p=a steaming bowl of soup with fresh herbs]
+Example: [p=two people walking hand in hand through a forest]
+
+Only include images when they genuinely enhance the storytelling experience and fit the genre conventions.
+
+## YOUR TASK
+Write page ${pageNumber} of ${editionDetails.books.page_count} for "${editionDetails.books.title}". 
+
+**Key Considerations:**
+- Continue the content naturally, maintaining consistency with established themes, concepts, and tone
+- Make this page engaging and authentic to the ${genre.label} genre while embodying ${editionDetails.books.authors.pen_name}'s distinctive writing style  
+- Use the complete book structure above to inform your content development and transitions
+${currentSection ? `- Remember you are ${sectionProgress.replace('(', '').replace(')', '')} - develop content accordingly` : ''}
+- Consider how this page serves the overall book's purpose while being valuable on its own
+- Create appropriate transitions and references to upcoming sections when relevant to the genre`
+
+
+    if (process.env.NODE_ENV === 'development') {
+      const debugDir = path.join(process.cwd(), 'debug')
+      if (!fs.existsSync(debugDir)) {
+        fs.mkdirSync(debugDir, { recursive: true })
+      }
+
+      const debugFile = path.join(debugDir, `system-prompt-${editionDetails.books.id}-page-${pageNumber}.txt`)
+      fs.writeFileSync(debugFile, systemPrompt)
+
+      console.log('📝 System prompt written to:', debugFile)
+    }
 
     // Use the messages from the request (for useChat compatibility)
     // Add system message if not present
@@ -176,13 +293,12 @@ Write page ${pageNumber} of ${editionDetails.books.page_count}. Make it engaging
     const result = streamText({
       model: aiProvider,
       messages: allMessages,
-      temperature: 0.8,
-      maxTokens: 2000,
+      temperature: modelTemperature
     })
 
     // Save the generated content to database after streaming completes
     // Note: We'll handle this in the frontend after streaming completes
-    
+
     return result.toDataStreamResponse()
 
   } catch (error) {
@@ -194,31 +310,3 @@ Write page ${pageNumber} of ${editionDetails.books.page_count}. Make it engaging
   }
 }
 
-function getFormatInstructions(title: string): string {
-  const lowerTitle = title.toLowerCase()
-  
-  if (lowerTitle.includes('cookbook') || lowerTitle.includes('recipe')) {
-    return `Format as a cookbook page with recipes, ingredients, and cooking instructions. Use markdown formatting:
-- **Recipe Name**
-- *Ingredients:*
-- *Instructions:*`
-  }
-  
-  if (lowerTitle.includes('poetry') || lowerTitle.includes('poem')) {
-    return `Format as poetry with proper line breaks and stanza separation. Use markdown formatting for emphasis.`
-  }
-  
-  if (lowerTitle.includes('manual') || lowerTitle.includes('guide') || lowerTitle.includes('academic')) {
-    return `Format as an academic/manual page with:
-- Clear headings using ## and ###
-- Bullet points for lists
-- **Bold** for key terms
-- Code blocks for examples if relevant`
-  }
-  
-  return `Format as a narrative page with:
-- Natural paragraph breaks
-- *Italics* for emphasis or thoughts
-- **Bold** for important moments
-- Proper dialogue formatting`
-} 
