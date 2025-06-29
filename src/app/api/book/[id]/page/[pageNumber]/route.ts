@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { streamText } from 'ai'
 import { createSupabaseServerClient } from '@/lib/supabase'
 import { getAIProvider } from '@/lib/ai'
+import { PostHog } from 'posthog-node'
 import fs from 'fs'
 import path from 'path'
 
@@ -83,6 +84,16 @@ export async function POST(
     console.log('📚 Page generation request:', { editionId, pageNumber })
 
     const supabase = await createSupabaseServerClient()
+
+    // Initialize PostHog
+    const posthog = new PostHog(
+      process.env.NEXT_PUBLIC_POSTHOG_KEY!,
+      { host: process.env.NEXT_PUBLIC_POSTHOG_HOST || 'https://app.posthog.com' }
+    )
+
+    // Check if image generation feature is enabled
+    const imagesEnabled = await posthog.isFeatureEnabled('book-page-images', 'default')
+    console.log('🎨 Images enabled:', imagesEnabled)
 
     // Get edition details including book, author, genre, and model info
     const { data: editionDetails, error: editionError } = await supabase
@@ -247,7 +258,7 @@ ${formatInstructions}
 ## PAGE LENGTH GUIDANCE
 Aim for approximately ${tokensPerPage} words for this page. This should provide the right pacing and depth for the ${genre.label} genre.
 
-## IMAGE GENERATION INSTRUCTIONS
+${imagesEnabled ? `## IMAGE GENERATION INSTRUCTIONS
 If the content, genre, or narrative context calls for a visual element, you may include images using this exact format:
 [p=simple one sentence description of the image in lowercase with no special characters]
 You should not make images in every page unless the genre is an inherently visual one like an illustrated children's book or a comic book or a cookbook or something like that.
@@ -258,7 +269,7 @@ Example: [p=a mysterious castle silhouetted against a stormy sky]
 Example: [p=a steaming bowl of soup with fresh herbs]
 Example: [p=two people walking hand in hand through a forest]
 
-Only include images when they genuinely enhance the storytelling experience and fit the genre conventions.
+Only include images when they genuinely enhance the storytelling experience and fit the genre conventions.` : ''}
 
 ## YOUR TASK
 Write page ${pageNumber} of ${editionDetails.books.page_count} for "${editionDetails.books.title}". 
