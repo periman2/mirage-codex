@@ -107,7 +107,7 @@ export default function HomePage() {
               <p className="text-base md:text-lg text-slate-800 dark:text-amber-50 leading-relaxed max-w-3xl mx-auto">
                 A living archive born from the collective imagination. 
                 <br />
-                This library is been generated while you are searching in it.
+                This library is been generated while you are searching inside of it.
               </p>
             </div>
           </div>

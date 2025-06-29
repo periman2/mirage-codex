@@ -66,6 +66,50 @@ export type Database = {
         }
         Relationships: []
       }
+      book_page_images: {
+        Row: {
+          created_at: string | null
+          data: Json | null
+          edition_id: string
+          hash: string
+          id: string
+          image_url: string | null
+          page_number: number
+          prompt_text: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          data?: Json | null
+          edition_id: string
+          hash: string
+          id?: string
+          image_url?: string | null
+          page_number: number
+          prompt_text: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          data?: Json | null
+          edition_id?: string
+          hash?: string
+          id?: string
+          image_url?: string | null
+          page_number?: number
+          prompt_text?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "book_page_images_edition_id_fkey"
+            columns: ["edition_id"]
+            isOneToOne: false
+            referencedRelation: "editions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       book_pages: {
         Row: {
           content: string

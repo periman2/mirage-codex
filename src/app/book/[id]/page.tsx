@@ -1,38 +1,35 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { useParams, useSearchParams, useRouter } from 'next/navigation'
 import { useChat } from '@ai-sdk/react'
 import { useAuth } from '@/lib/auth-context'
-import { supabase } from '@/lib/supabase'
-import { useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { ChevronLeft, ChevronRight, Bookmark, BookmarkMinus, Share2, Book, Eye, List, Heart, Users, Settings } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Bookmark, Share2, Eye, Heart } from 'lucide-react'
 import { toast } from 'sonner'
 import Markdown from 'react-markdown'
-import { useBookStats, useBookLike, useBookView, usePageStats, usePageLike, usePageView, usePageContent, useBookmark } from '@/hooks/useBookStats'
+import { useBookStats, useBookLike, useBookView, usePageStats, usePageLike, usePageView, usePageContent } from '@/hooks/useBookStats'
 import { useBookData, type BookData, type BookEdition } from '@/hooks/useBookData'
+import { useBookmarks } from '@/hooks/useBookmarks'
+import { BookInfoSidebar } from '@/components/book-info-sidebar'
+import { BookmarkDialogs } from '@/components/bookmark-dialogs'
 
 export default function BookDetailPage() {
+  
   const { user } = useAuth()
   const params = useParams()
   const searchParams = useSearchParams()
   const router = useRouter()
-  const queryClient = useQueryClient()
   const bookId = params?.id as string
   const editionId = searchParams?.get('edition') // Get edition from URL params
 
   // Use the new hook for book data
   const { data: book, isLoading: loading, error: bookError } = useBookData(bookId)
-  
+
   // Determine current edition from URL params or default to first edition
   const currentEdition = book?.editions.find(ed => ed.id === editionId) || book?.editions[0]
-  
+
   const [currentPage, setCurrentPage] = useState(() => {
     const pageParam = searchParams?.get('page')
     return pageParam ? parseInt(pageParam) : 1
@@ -42,18 +39,38 @@ export default function BookDetailPage() {
   const [isPageCached, setIsPageCached] = useState(false) // Track if page content is cached/saved
   const [isMobileBookInfoOpen, setIsMobileBookInfoOpen] = useState(false)
 
-  const [bookmarkNote, setBookmarkNote] = useState('')
-  const [isBookmarkDialogOpen, setIsBookmarkDialogOpen] = useState(false)
-  const [isBookmarksListOpen, setIsBookmarksListOpen] = useState(false)
-  const [allBookmarks, setAllBookmarks] = useState<Array<{ id: number, page_number: number, note: string | null, created_at: string | null }>>([])
-  const [bookmarksLoading, setBookmarksLoading] = useState(false)
-  
+
   // Optimistic UI state
   const [optimisticBookLike, setOptimisticBookLike] = useState<{ liked: boolean; count: number } | null>(null)
   const [optimisticPageLike, setOptimisticPageLike] = useState<{ liked: boolean; count: number } | null>(null)
-  
+
   // Ref to prevent duplicate generation requests
   const generationInProgress = useRef(false)
+
+  // Function to replace image prompts with markdown image syntax
+  const processImagePrompts = (content: string): string => {
+    if (!currentEdition?.id || !bookId || !currentPage) return content
+
+    const promptPattern = /\[p=([^\]]+)\]/g
+    
+    console.log('🔄 Processing image prompts in content...', content);
+
+    // Replace [p=prompt] with markdown image pointing to our API route
+    const processedContent = content.replace(promptPattern, (match, prompt) => {
+      const trimmedPrompt = prompt.trim()
+      const imageUrl = `/api/book/${bookId}/page/${currentPage}/image?prompt=${encodeURIComponent(trimmedPrompt)}&edition=${currentEdition.id}`
+      
+      console.log(`🖼️ Replacing "${match}" with image URL: ${imageUrl}`);
+      
+      // Simple markdown image syntax - let the browser handle loading
+      return `\n\n![Scene: ${trimmedPrompt}](${imageUrl})\n*${trimmedPrompt}*\n\n`
+    })
+
+    console.log('✅ Image prompt replacement complete');
+    return processedContent
+  }
+
+
 
   // Book-level stats hooks (only enabled when page content is cached/saved)
   const { data: bookStats, refetch: refetchBookStats } = useBookStats(bookId, isPageCached)
@@ -67,18 +84,19 @@ export default function BookDetailPage() {
       editionId: currentEdition?.id
     },
     onFinish: async (message) => {
-      // Save the generated content to database
+      // Save the content to database (keeping [p=...] patterns for image processing)
       if (message.content && currentEdition?.id) {
         try {
+          // Save the raw content (with [p=...] patterns) to database
           await fetch(`/api/book/${bookId}/page/${currentPage}/save`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               editionId: currentEdition.id,
-              content: message.content
+              content: message.content // Keep the raw content with patterns
             })
           })
-          setPageContent(message.content)
+          setPageContent(message.content) // Store raw content with patterns
           setIsPageCached(true) // Mark as cached since we successfully saved to database
           console.log('✅ Page content saved to database')
         } catch (error) {
@@ -100,23 +118,24 @@ export default function BookDetailPage() {
 
   // Page content loading query (don't load if we already have cached content)
   const shouldLoadPageContent = !!currentEdition?.id && !!currentPage && !isGenerating && chatStatus !== 'streaming' && !generationInProgress.current && !isPageCached
-  
-  const { 
+
+  const {
     isLoading: isPageContentLoading
   } = usePageContent(
-    bookId, 
-    currentPage, 
-    currentEdition?.id, 
+    bookId,
+    currentPage,
+    currentEdition?.id,
     shouldLoadPageContent,
     // onSuccess callback
     (data) => {
       console.log('📄 Page content loaded:', data);
       if (data.exists && data.content) {
-        // Content exists in database, set it and mark as cached
+        
+        // Store the RAW content (with [p=...] patterns) so processImagePrompts can find them
         setPageContent(data.content);
         setIsPageCached(true);
-        console.log('✅ Page content set from cache');
-        
+        console.log('✅ Page content set from cache (keeping original [p=...] patterns)');
+
         // Track page view when content is loaded from cache
         if (currentEdition?.id) {
           trackPageView(currentEdition.id);
@@ -141,22 +160,22 @@ export default function BookDetailPage() {
   // Page-level stats hooks (only fetch if page content is cached/saved)
   const shouldFetchPageStats = isPageCached && !isGenerating && chatStatus !== 'streaming'
   const { data: pageStats } = usePageStats(
-    bookId, 
-    currentPage, 
+    bookId,
+    currentPage,
     currentEdition?.id,
     shouldFetchPageStats
   )
   const pageLikeMutation = usePageLike(bookId, currentPage)
   const { trackView: trackPageView } = usePageView(bookId, currentPage)
 
-  // Bookmark hook (only enabled when page is cached, user is logged in, and book exists)
-  const shouldFetchBookmark = isPageCached && !!user && !!book;
-
-  const { 
-    data: existingBookmark, 
-    isLoading: bookmarkLoading, 
-    error: bookmarkError 
-  } = useBookmark(user?.id, currentEdition?.id, currentPage, shouldFetchBookmark)
+  // Bookmarks hook - handles all bookmark-related logic
+  const bookmarks = useBookmarks({
+    user,
+    currentEdition,
+    currentPage,
+    isPageCached,
+    onPageChange: setCurrentPage
+  })
 
   // Function to update URL with current page and edition
   const updatePageURL = (pageNumber: number, newEditionId?: string) => {
@@ -178,10 +197,10 @@ export default function BookDetailPage() {
     // Reset page content when switching editions
     setPageContent('')
     setIsPageCached(false)
-    
+
     // Update URL with new edition
     updatePageURL(currentPage, newEditionId)
-    
+
     toast.success('Switched to different edition')
   }
 
@@ -197,7 +216,7 @@ export default function BookDetailPage() {
 
     generationInProgress.current = true
     setIsGenerating(true)
-    
+
     try {
       await append({
         role: 'user',
@@ -217,13 +236,6 @@ export default function BookDetailPage() {
     }
   }, [currentEdition?.id, currentPage])
 
-  // Load all bookmarks when user and book are available
-  useEffect(() => {
-    if (user && book) {
-      loadAllBookmarks()
-    }
-  }, [user?.id, currentEdition?.id])
-
   // Track book view when page content is cached (book successfully loaded)
   useEffect(() => {
     if (book && isPageCached) {
@@ -236,6 +248,14 @@ export default function BookDetailPage() {
     setPageContent('')
     setIsPageCached(false)
   }, [currentPage, currentEdition?.id])
+
+  // Memoize the processed content to avoid unnecessary re-processing  
+  const processedPageContent = useMemo(() => {
+    if (!pageContent) return ''
+    
+    console.log('🧠 Memoizing page content processing...');
+    return processImagePrompts(pageContent)
+  }, [pageContent, currentEdition?.id, bookId, currentPage])
 
   const nextPage = () => {
     if (book && currentPage < book.pageCount) {
@@ -253,135 +273,13 @@ export default function BookDetailPage() {
     }
   }
 
-  // Load all bookmarks for current edition
-  const loadAllBookmarks = async () => {
-    if (!user || !currentEdition) return
 
-    setBookmarksLoading(true)
-    try {
-      const { data, error } = await supabase
-        .from('bookmarks')
-        .select('id, page_number, note, created_at')
-        .eq('user_id', user.id)
-        .eq('edition_id', currentEdition.id)
-        .order('page_number', { ascending: true })
-
-      if (error) {
-        console.error('Error loading bookmarks:', error)
-        toast.error('Failed to load bookmarks')
-        return
-      }
-
-      setAllBookmarks(data || [])
-    } catch (error) {
-      console.error('Error loading bookmarks:', error)
-      toast.error('Failed to load bookmarks')
-    } finally {
-      setBookmarksLoading(false)
-    }
-  }
-
-  // Jump to a bookmarked page
-  const jumpToBookmark = (pageNumber: number) => {
-    setCurrentPage(pageNumber)
-    setIsBookmarksListOpen(false)
-    toast.success(`Jumped to page ${pageNumber}`)
-    // URL will be updated automatically by useEffect
-  }
-
-  // Create a new bookmark
-  const createBookmark = async () => {
-    if (!user || !currentEdition) return
-
-    try {
-      const { data, error } = await supabase
-        .from('bookmarks')
-        .insert({
-          user_id: user.id,
-          edition_id: currentEdition.id,
-          page_number: currentPage,
-          note: bookmarkNote.trim() || null
-        })
-        .select('id, note')
-        .single()
-
-      if (error) {
-        console.error('Error creating bookmark:', error)
-        toast.error('Failed to save bookmark')
-        return
-      }
-
-      // Invalidate bookmark queries to refetch data
-      queryClient.invalidateQueries({ queryKey: ['bookmark', user!.id, currentEdition!.id, currentPage] })
-      setBookmarkNote('')
-      setIsBookmarkDialogOpen(false)
-      toast.success('Bookmark saved!')
-
-      // Refresh bookmarks list
-      loadAllBookmarks()
-    } catch (error) {
-      console.error('Error creating bookmark:', error)
-      toast.error('Failed to save bookmark')
-    }
-  }
-
-  // Delete existing bookmark
-  const deleteBookmark = async () => {
-    if (!existingBookmark) return
-
-    try {
-      const { error } = await supabase
-        .from('bookmarks')
-        .delete()
-        .eq('id', existingBookmark.id)
-
-      if (error) {
-        console.error('Error deleting bookmark:', error)
-        toast.error('Failed to remove bookmark')
-        return
-      }
-
-      // Invalidate bookmark queries to refetch data
-      queryClient.invalidateQueries({ queryKey: ['bookmark', user!.id, currentEdition!.id, currentPage] })
-      toast.success('Bookmark removed!')
-
-      // Refresh bookmarks list
-      loadAllBookmarks()
-    } catch (error) {
-      console.error('Error deleting bookmark:', error)
-      toast.error('Failed to remove bookmark')
-    }
-  }
-
-  const handleBookmark = async () => {
-    if (!user) {
-      toast.error('Please sign in to save bookmarks')
-      return
-    }
-
-    if (existingBookmark) {
-      await deleteBookmark()
-    } else {
-      setBookmarkNote('') // Reset note when opening dialog
-      setIsBookmarkDialogOpen(true)
-    }
-  }
 
   const handleShare = async () => {
     // Use current URL which already has the page and edition cached
     const url = window.location.href
     await navigator.clipboard.writeText(url)
     toast.success('Page link copied to clipboard!')
-  }
-
-  const handleOpenBookmarksList = () => {
-    if (!user) {
-      toast.error('Please sign in to view bookmarks')
-      return
-    }
-
-    setIsBookmarksListOpen(true)
-    loadAllBookmarks()
   }
 
   // Handle book like/unlike with optimistic updates
@@ -396,7 +294,7 @@ export default function BookDetailPage() {
     const currentCount = optimisticBookLike?.count ?? bookStats?.likes ?? book?.stats?.likes ?? 0
     const newLiked = !currentLiked
     const newCount = newLiked ? currentCount + 1 : Math.max(0, currentCount - 1)
-    
+
     setOptimisticBookLike({ liked: newLiked, count: newCount })
 
     try {
@@ -430,7 +328,7 @@ export default function BookDetailPage() {
     const currentCount = optimisticPageLike?.count ?? pageStats?.likes ?? 0
     const newLiked = !currentLiked
     const newCount = newLiked ? currentCount + 1 : Math.max(0, currentCount - 1)
-    
+
     setOptimisticPageLike({ liked: newLiked, count: newCount })
 
     try {
@@ -480,200 +378,24 @@ export default function BookDetailPage() {
 
   return (
     <div className="h-[calc(100vh-4rem)] bg-mirage-gradient relative">
-      {/* Mobile Book Info Button */}
-      <Button
-        onClick={() => setIsMobileBookInfoOpen(true)}
-        className="md:hidden fixed top-24 left-4 z-40 h-10 w-10 p-0 rounded-full shadow-lg"
-        style={{
-          backgroundColor: 'rgb(217 119 6)',
-          borderColor: 'rgb(217 119 6)',
-          color: 'white'
-        }}
-      >
-        <Book className="h-5 w-5" style={{ color: 'white' }} />
-      </Button>
-
-      {/* Mobile Overlay */}
-      {isMobileBookInfoOpen && (
-        <div className="md:hidden fixed inset-0 bg-black/50 z-40" onClick={() => setIsMobileBookInfoOpen(false)} />
-      )}
-
       <div className="flex h-full">
         {/* Left Sidebar - Book Information */}
-        <div className={`
-          w-80 h-full bg-white/95 backdrop-blur-md border-r border-mirage-border-primary shadow-xl
-          md:relative md:block md:translate-x-0
-          ${isMobileBookInfoOpen
-            ? 'fixed inset-y-0 left-0 z-50 translate-x-0 transition-transform duration-300 ease-out md:transition-none'
-            : 'fixed inset-y-0 left-0 -translate-x-full transition-transform duration-300 ease-out md:transition-none md:translate-x-0'
-          }
-        `}>
-          <div className="h-full overflow-y-auto">
-            {/* Mobile Close Button */}
-            <div className="md:hidden flex justify-between items-center p-4 border-b border-mirage-border-primary">
-              <h2 className="text-lg font-semibold text-mirage-text-primary">
-                Book Info
-              </h2>
-              <Button
-                onClick={() => setIsMobileBookInfoOpen(false)}
-                variant="ghost"
-                className="h-8 w-8 p-0"
-              >
-                ×
-              </Button>
-            </div>
-
-            <div className="space-y-6 p-6">
-              {/* Book Cover */}
-              <div className="aspect-square relative rounded-lg overflow-hidden shadow-lg">
-                <img
-                  src={`/api/book/${book.id}/cover`}
-                  alt={book.title}
-                  className="w-full h-full object-cover"
-                />
-              </div>
-
-              {/* Book Details */}
-              <div className="space-y-4">
-                <h1 className="text-2xl font-bold text-mirage-text-primary leading-tight">
-                  {book.title}
-                </h1>
-                <p className="text-base text-mirage-text-tertiary font-medium">
-                  by {book.author.penName}
-                </p>
-                <div className="space-y-1">
-                  <p className="text-sm text-mirage-text-muted">
-                    {book.pageCount} pages • {book.language}
-                  </p>
-                  <p className="text-sm">
-                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium text-white" style={{ backgroundColor: 'rgb(217 119 6)' }}>
-                      {book.genre.label}
-                    </span>
-                  </p>
-                  {/* Book Stats with Like Button */}
-                  <div className="flex items-center space-x-4 pt-2">
-                    <div className="flex items-center space-x-1 text-sm text-mirage-text-muted">
-                      {user ? (
-                        <button
-                          onClick={handleBookLike}
-                          disabled={bookLikeMutation.isPending}
-                          className="flex items-center space-x-1 hover:text-red-500 transition-colors cursor-pointer"
-                          title={`${optimisticBookLike?.liked ?? bookStats?.userLiked ? 'Unlike' : 'Like'} this book`}
-                        >
-                          <Heart className={`h-4 w-4 ${optimisticBookLike?.liked ?? bookStats?.userLiked ? 'fill-red-500 text-red-500' : ''}`} />
-                          <span>{optimisticBookLike?.count ?? bookStats?.likes ?? book.stats?.likes ?? 0}</span>
-                        </button>
-                      ) : (
-                        <div className="flex items-center space-x-1">
-                          <Heart className="h-4 w-4" />
-                          <span>{bookStats?.likes || book.stats?.likes || 0}</span>
-                        </div>
-                      )}
-                    </div>
-                    <div className="flex items-center space-x-1 text-sm text-mirage-text-muted">
-                      <Users className="h-4 w-4" />
-                      <span>{bookStats?.views || book.stats?.views || 0}</span>
-                    </div>
-                  </div>
-                </div>
-                
-                {/* Edition Selection */}
-                {book.editions.length > 1 && (
-                  <div className="space-y-2">
-                    <Label htmlFor="edition-select" className="text-sm font-medium text-mirage-text-primary">
-                      Edition
-                    </Label>
-                    <Select value={currentEdition?.id || ''} onValueChange={handleEditionChange}>
-                      <SelectTrigger className="w-full bg-white/90 border-mirage-border-primary">
-                        <SelectValue placeholder="Select edition" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {book.editions.map((edition) => (
-                          <SelectItem key={edition.id} value={edition.id}>
-                            {edition.modelName}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-                
-                <p className="text-sm text-mirage-text-muted">
-                  Generated with {currentEdition?.modelName || 'Unknown Model'}
-                </p>
-              </div>
-
-              {/* Book Summary */}
-              <Dialog>
-                <div className="bg-mirage-bg-tertiary/50 rounded-lg p-4 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-base font-semibold text-mirage-text-primary">Summary</h3>
-                  </div>
-                  <DialogTrigger asChild>
-                    <div className="cursor-pointer">
-                      <p className="text-sm text-mirage-text-secondary/80 leading-relaxed overflow-hidden" style={{
-                        display: '-webkit-box',
-                        WebkitLineClamp: 3,
-                        WebkitBoxOrient: 'vertical'
-                      }}>
-                        {book.summary}
-                      </p>
-                      <p className="text-xs text-mirage-text-muted/70 italic mt-2 hover:text-mirage-text-secondary transition-colors">
-                        Click to read full summary...
-                      </p>
-                    </div>
-                  </DialogTrigger>
-                </div>
-                <DialogContent className="max-w-2xl bg-white/95 backdrop-blur-md border border-mirage-border-primary shadow-xl">
-                  <DialogHeader>
-                    <DialogTitle className="text-xl font-bold text-mirage-text-primary">
-                      {book.title}
-                    </DialogTitle>
-                  </DialogHeader>
-                  <div className="mt-4">
-                    <h4 className="text-lg font-semibold text-mirage-text-secondary mb-3">Summary</h4>
-                    <p className="text-base text-mirage-text-primary leading-relaxed">
-                      {book.summary}
-                    </p>
-                  </div>
-                </DialogContent>
-              </Dialog>
-
-              {/* Action Buttons */}
-              <div className="space-y-3">
-                {/* View Bookmarks Button */}
-                {user ? (
-                  <Button
-                    variant="outline"
-                    size="default"
-                    className="w-full flex items-center gap-2 h-10"
-                    onClick={handleOpenBookmarksList}
-                  >
-                    <List className="h-4 w-4" />
-                    View Bookmarks ({allBookmarks.length})
-                  </Button>
-                ) : (
-                  <Button
-                    variant="outline"
-                    size="default"
-                    className="w-full flex items-center gap-2 h-10 opacity-50 cursor-not-allowed"
-                    disabled
-                  >
-                    <List className="h-4 w-4" />
-                    Sign in for Bookmarks
-                  </Button>
-                )}
-              </div>
-
-              {/* Page Info */}
-              <div className="text-center">
-                <span className="text-base text-mirage-text-tertiary font-medium">
-                  Page {currentPage} of {book.pageCount}
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
+        <BookInfoSidebar
+          book={book}
+          currentEdition={currentEdition}
+          currentPage={currentPage}
+          isOpen={isMobileBookInfoOpen}
+          onClose={() => setIsMobileBookInfoOpen(false)}
+          onOpen={() => setIsMobileBookInfoOpen(true)}
+          onEditionChange={handleEditionChange}
+          user={user}
+          bookStats={bookStats}
+          optimisticBookLike={optimisticBookLike}
+          onBookLike={handleBookLike}
+          isBookLikePending={bookLikeMutation.isPending}
+          allBookmarks={bookmarks.allBookmarks}
+          onOpenBookmarksList={bookmarks.handleOpenBookmarksList}
+        />
 
         {/* Main Content - Page Content */}
         <div className="flex-1 p-4 md:p-4 pt-16 md:pt-4 flex flex-col">
@@ -683,7 +405,7 @@ export default function BookDetailPage() {
               <div className="px-4 py-3 md:px-6 md:py-4 border-b border-mirage-border-primary bg-white/90">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    
+
                     {/* Page stats and actions */}
                     <div className="flex items-center gap-3">
                       {/* Page Like Button */}
@@ -703,21 +425,21 @@ export default function BookDetailPage() {
                           <span>{pageStats?.likes ?? 0}</span>
                         </div>
                       )}
-                      
+
                       {/* Page Views */}
                       <div className="flex items-center space-x-1 text-sm text-mirage-text-muted">
                         <Eye className="h-4 w-4" />
                         <span>{pageStats?.views ?? 0}</span>
                       </div>
-                      
+
                       {/* Bookmark Button */}
                       {user ? (
                         <button
-                          onClick={handleBookmark}
+                          onClick={bookmarks.handleBookmark}
                           className="hover:scale-110 transition-transform cursor-pointer"
-                          title={existingBookmark ? (existingBookmark.note ? `Bookmarked: ${existingBookmark.note}` : 'Remove bookmark') : 'Add bookmark'}
+                          title={bookmarks.existingBookmark ? (bookmarks.existingBookmark.note ? `Bookmarked: ${bookmarks.existingBookmark.note}` : 'Remove bookmark') : 'Add bookmark'}
                         >
-                          {existingBookmark ? (
+                          {bookmarks.existingBookmark ? (
                             <Bookmark className="h-4 w-4 fill-current" style={{ color: 'rgb(217 119 6)' }} />
                           ) : (
                             <Bookmark className="h-4 w-4 text-mirage-text-muted hover:text-amber-600 transition-colors" />
@@ -726,7 +448,7 @@ export default function BookDetailPage() {
                       ) : (
                         <Bookmark className="h-4 w-4 text-mirage-text-muted opacity-50" />
                       )}
-                      
+
                       {/* Share Button */}
                       <button
                         onClick={handleShare}
@@ -794,9 +516,22 @@ export default function BookDetailPage() {
                             ul: ({ children }) => <ul className="list-disc list-inside mb-4 text-mirage-text-primary space-y-1">{children}</ul>,
                             ol: ({ children }) => <ol className="list-decimal list-inside mb-4 text-mirage-text-primary space-y-1">{children}</ol>,
                             blockquote: ({ children }) => <blockquote className="border-l-4 border-mirage-border-primary pl-4 italic text-mirage-text-secondary mb-4">{children}</blockquote>,
+                            img: ({ src, alt, ...props }) => (
+                              <img 
+                                src={src} 
+                                alt={alt}
+                                className="w-full max-w-2xl mx-auto my-6 rounded-lg shadow-lg hover:scale-105 transition-transform duration-300"
+                                loading="lazy"
+                                style={{ display: 'block' }}
+                                {...props}
+                              />
+                            ),
                           }}
                         >
-                          {messages[messages.length - 1]?.content || ''}
+                          {(() => {
+                            const streamingContent = messages[messages.length - 1]?.content || ''
+                            return processImagePrompts(streamingContent)
+                          })()}
                         </Markdown>
                       </div>
                     </div>
@@ -813,10 +548,20 @@ export default function BookDetailPage() {
                           ul: ({ children }) => <ul className="list-disc list-inside mb-4 text-mirage-text-primary space-y-1">{children}</ul>,
                           ol: ({ children }) => <ol className="list-decimal list-inside mb-4 text-mirage-text-primary space-y-1">{children}</ol>,
                           blockquote: ({ children }) => <blockquote className="border-l-4 border-mirage-border-primary pl-4 italic text-mirage-text-secondary mb-4">{children}</blockquote>,
+                                                      img: ({ src, alt, ...props }) => (
+                              <img 
+                                src={src} 
+                                alt={alt}
+                                className="w-full max-w-2xl mx-auto my-6 rounded-lg shadow-lg hover:scale-105 transition-transform duration-300"
+                                loading="lazy"
+                                style={{ display: 'block' }}
+                                {...props}
+                              />
+                            ),
                         }}
-                      >
-                        {pageContent}
-                      </Markdown>
+                                              >
+                          {processedPageContent}
+                        </Markdown>
                     </div>
                   ) : (
                     <div className="flex items-center justify-center h-64">
@@ -850,134 +595,20 @@ export default function BookDetailPage() {
         </div>
       </div>
 
-      {/* Bookmark Dialog */}
-      <Dialog open={isBookmarkDialogOpen} onOpenChange={setIsBookmarkDialogOpen}>
-        <DialogContent className="max-w-md bg-white/95 backdrop-blur-md border border-mirage-border-primary shadow-xl">
-          <DialogHeader>
-            <DialogTitle className="text-lg font-bold text-mirage-text-primary">
-              Add Bookmark
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 mt-4">
-            <div>
-              <p className="text-sm text-mirage-text-secondary mb-3">
-                Bookmarking page {currentPage} of "{book?.title}"
-              </p>
-              <Label htmlFor="bookmark-note" className="text-sm font-medium text-mirage-text-primary">
-                Note (optional)
-              </Label>
-              <Input
-                id="bookmark-note"
-                value={bookmarkNote}
-                onChange={(e) => setBookmarkNote(e.target.value)}
-                placeholder="Add a note about this page..."
-                className="mt-1 bg-white/90 border-mirage-border-primary"
-                maxLength={500}
-              />
-              <p className="text-xs text-mirage-text-muted/70 mt-1">
-                {bookmarkNote.length}/500 characters
-              </p>
-            </div>
-            <div className="flex space-x-2 pt-2">
-              <Button
-                onClick={() => setIsBookmarkDialogOpen(false)}
-                variant="outline"
-                className="flex-1"
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={createBookmark}
-                className="flex-1"
-                style={{
-                  backgroundColor: 'rgb(217 119 6)',
-                  borderColor: 'rgb(217 119 6)',
-                  color: 'white'
-                }}
-              >
-                Save Bookmark
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Bookmarks List Modal */}
-      <Dialog open={isBookmarksListOpen} onOpenChange={setIsBookmarksListOpen}>
-        <DialogContent className="max-w-md max-h-[80vh] bg-white/95 backdrop-blur-md border border-mirage-border-primary shadow-xl">
-          <DialogHeader>
-            <DialogTitle className="text-lg font-bold text-mirage-text-primary flex items-center gap-2">
-              <List className="h-5 w-5" />
-              Bookmarks for "{book?.title}"
-            </DialogTitle>
-          </DialogHeader>
-          <div className="mt-4 space-y-2 max-h-96 overflow-y-auto">
-            {bookmarksLoading ? (
-              <div className="flex items-center justify-center py-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2" style={{ borderColor: 'rgb(217 119 6)' }}></div>
-              </div>
-            ) : allBookmarks.length === 0 ? (
-              <div className="text-center py-8 text-mirage-text-muted">
-                <Bookmark className="h-12 w-12 mx-auto mb-3 opacity-50" />
-                <p className="text-sm">No bookmarks yet.</p>
-                <p className="text-xs text-mirage-text-light mt-1">Bookmark pages as you read to quickly return to them.</p>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {allBookmarks.map((bookmark) => (
-                  <div
-                    key={bookmark.id}
-                    className={`
-                      p-3 rounded-lg border cursor-pointer transition-all duration-200 hover:shadow-md
-                      ${bookmark.page_number === currentPage
-                        ? 'bg-mirage-bg-tertiary border-mirage-border-primary shadow-sm'
-                        : 'bg-white/90 border-mirage-border-primary hover:bg-white'
-                      }
-                    `}
-                    onClick={() => jumpToBookmark(bookmark.page_number)}
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="font-medium text-mirage-text-primary">
-                            Page {bookmark.page_number}
-                          </span>
-                          {bookmark.page_number === currentPage && (
-                            <span 
-                              className="text-xs text-white px-1.5 py-0.5 rounded"
-                              style={{ backgroundColor: 'rgb(217 119 6)' }}
-                            >
-                              Current
-                            </span>
-                          )}
-                        </div>
-                        {bookmark.note && (
-                          <p className="text-sm text-mirage-text-tertiary line-clamp-2">
-                            {bookmark.note}
-                          </p>
-                        )}
-                        <p className="text-xs text-mirage-text-light mt-1">
-                          {bookmark.created_at ? new Date(bookmark.created_at).toLocaleDateString() : 'Unknown date'}
-                        </p>
-                      </div>
-                      <ChevronRight className="h-4 w-4 text-mirage-text-light flex-shrink-0 ml-2" />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-          <div className="flex justify-end pt-4 border-t border-mirage-border-primary">
-            <Button
-              onClick={() => setIsBookmarksListOpen(false)}
-              variant="outline"
-              className="border-mirage-border-primary"
-            >
-              Close
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      {/* Bookmark Dialogs */}
+      <BookmarkDialogs
+        isCreateOpen={bookmarks.isBookmarkDialogOpen}
+        onCreateOpenChange={bookmarks.setIsBookmarkDialogOpen}
+        currentPage={currentPage}
+        bookTitle={book?.title || ''}
+        onCreateBookmark={bookmarks.createBookmark}
+        isListOpen={bookmarks.isBookmarksListOpen}
+        onListOpenChange={bookmarks.setIsBookmarksListOpen}
+        allBookmarks={bookmarks.allBookmarks}
+        bookmarksLoading={bookmarks.bookmarksLoading}
+        currentPageNumber={currentPage}
+        onJumpToBookmark={bookmarks.jumpToBookmark}
+      />
     </div>
   )
 } 

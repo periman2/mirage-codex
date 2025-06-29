@@ -28,7 +28,7 @@ export default function BrowsePage() {
           <div className="flex items-center justify-between">
             <div className="text-left">
               <h1 className="text-4xl font-bold text-mirage-text-primary mb-2">
-                Browse Library
+                Browse The Codex
               </h1>
               <p className="text-mirage-text-tertiary text-lg">
                 Discover books from the infinite collection

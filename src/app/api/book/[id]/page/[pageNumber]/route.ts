@@ -250,6 +250,9 @@ Aim for approximately ${tokensPerPage} words for this page. This should provide 
 ## IMAGE GENERATION INSTRUCTIONS
 If the content, genre, or narrative context calls for a visual element, you may include images using this exact format:
 [p=simple one sentence description of the image in lowercase with no special characters]
+You should not make images in every page unless the genre is an inherently visual one like an illustrated children's book or a comic book or a cookbook or something like that.
+Fantasy book might have some images here and there but not every page!
+ALWAYS WRITE THE PROMPTS FOR THE IMAGES IN THE ENGLISH LANGUAGE EVEN IF THE CONTENT OF THE PAGE IS NOT IN ENGLISH.
 
 Example: [p=a mysterious castle silhouetted against a stormy sky]
 Example: [p=a steaming bowl of soup with fresh herbs]

@@ -67,7 +67,7 @@ export function Navbar() {
             {/* Desktop Navigation */}
             <nav className="hidden md:flex items-center space-x-6">
               <a 
-                href="/" 
+                href="/browse" 
                 className="text-sm text-slate-700 hover:text-amber-700 dark:text-amber-100 dark:hover:text-amber-200 transition-colors"
               >
                 Browse
