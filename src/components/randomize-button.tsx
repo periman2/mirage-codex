@@ -8,9 +8,15 @@ import { useRouter } from 'next/navigation'
 
 interface RandomizeButtonProps {
   variant?: 'default' | 'outline'
+  className?: string
+  style?: React.CSSProperties
 }
 
-export function RandomizeButton({ variant = 'default' }: RandomizeButtonProps) {
+export function RandomizeButton({ 
+  variant = 'default', 
+  className = '',
+  style = {} 
+}: RandomizeButtonProps) {
   const router = useRouter()
   const randomBookQuery = useRandomBook()
 
@@ -32,12 +38,17 @@ export function RandomizeButton({ variant = 'default' }: RandomizeButtonProps) {
     }
   }
 
+  const defaultClassName = variant === 'default' 
+    ? 'bg-gradient-to-r from-orange-400 to-orange-500 hover:from-orange-500 hover:to-orange-600' 
+    : ''
+
   return (
     <Button
       onClick={handleRandomize}
       disabled={randomBookQuery.isFetching}
       variant={variant}
-      className={variant === 'default' ? 'bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700' : ''}
+      className={`${defaultClassName} ${className}`}
+      style={style}
     >
       <DiceFive className={`w-5 h-5 mr-2 ${randomBookQuery.isFetching ? 'animate-spin' : ''}`} />
       {randomBookQuery.isFetching ? 'Discovering...' : 'Randomize'}

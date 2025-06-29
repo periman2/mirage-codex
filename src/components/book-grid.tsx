@@ -140,14 +140,14 @@ export function BookSection({
   if (isLoading) {
     return (
       <div className="space-y-4">
-        <div className="h-7 bg-amber-200/30 rounded w-48 animate-pulse" />
+        <div className="h-7 bg-mirage-border-primary/30 rounded w-48 animate-pulse" />
         <div className="flex space-x-4 overflow-hidden">
           {Array.from({ length: 6 }).map((_, i) => (
             <div key={i} className="flex-none w-48">
-              <div className="aspect-square bg-amber-200/30 rounded-xl animate-pulse mb-3" />
+              <div className="aspect-square bg-mirage-border-primary/30 rounded-xl animate-pulse mb-3" />
               <div className="space-y-2">
-                <div className="h-4 bg-amber-200/30 rounded animate-pulse" />
-                <div className="h-3 bg-amber-200/30 rounded w-2/3 animate-pulse" />
+                <div className="h-4 bg-mirage-border-primary/30 rounded animate-pulse" />
+                <div className="h-3 bg-mirage-border-primary/30 rounded w-2/3 animate-pulse" />
               </div>
             </div>
           ))}
@@ -160,8 +160,8 @@ export function BookSection({
   if (!allBooks.length) {
     return (
       <div className="space-y-4">
-        <h2 className="text-xl font-bold text-amber-900">{title}</h2>
-        <div className="flex items-center justify-center h-32 text-amber-600 text-sm">
+        <h2 className="text-xl font-bold text-mirage-text-primary">{title}</h2>
+        <div className="flex items-center justify-center h-32 text-mirage-text-tertiary text-sm">
           No books available in this section yet.
         </div>
       </div>
@@ -171,16 +171,36 @@ export function BookSection({
   return (
     <div className="space-y-4 group">
       {/* Section Title */}
-      <h2 className="text-xl font-bold text-amber-900">{title}</h2>
+      <h2 className="text-xl font-bold text-mirage-text-primary">{title}</h2>
       
       {/* Scrollable Books Container */}
       <div className="relative">
+        {/* Left Shadow Gradient */}
+        {canScrollLeft && (
+          <div 
+            className="absolute left-0 top-0 bottom-0 w-12 z-20 pointer-events-none transition-opacity duration-300"
+            style={{
+              background: 'linear-gradient(to right, rgba(245, 245, 244, 0.8), transparent)'
+            }}
+          />
+        )}
+
+        {/* Right Shadow Gradient */}
+        {canScrollRight && (
+          <div 
+            className="absolute right-0 top-0 bottom-0 w-12 z-20 pointer-events-none transition-opacity duration-300"
+            style={{
+              background: 'linear-gradient(to left, rgba(245, 245, 244, 0.8), transparent)'
+            }}
+          />
+        )}
+
         {/* Left Scroll Button */}
         {canScrollLeft && (
           <Button
             variant="outline"
             size="sm"
-            className="absolute left-2 top-1/2 -translate-y-1/2 z-10 h-12 w-12 p-0 bg-white/95 backdrop-blur-sm border-amber-200/50 shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+            className="absolute left-2 top-1/2 -translate-y-1/2 z-30 h-12 w-12 p-0 bg-white/95 backdrop-blur-sm border-mirage-border-primary/50 shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300"
             onClick={() => scroll('left')}
           >
             <ArrowLeft className="h-5 w-5" />
@@ -192,7 +212,7 @@ export function BookSection({
           <Button
             variant="outline"
             size="sm"
-            className="absolute right-2 top-1/2 -translate-y-1/2 z-10 h-12 w-12 p-0 bg-white/95 backdrop-blur-sm border-amber-200/50 shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+            className="absolute right-2 top-1/2 -translate-y-1/2 z-30 h-12 w-12 p-0 bg-white/95 backdrop-blur-sm border-mirage-border-primary/50 shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300"
             onClick={() => scroll('right')}
           >
             <ArrowRight className="h-5 w-5" />
@@ -216,12 +236,12 @@ export function BookSection({
           {hasNextPage && (
             <div ref={loadTriggerRef} className="flex-none w-48 flex items-center justify-center">
               {isFetchingNextPage ? (
-                <div className="aspect-square bg-amber-200/30 rounded-xl animate-pulse flex items-center justify-center">
-                  <div className="w-8 h-8 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
+                <div className="aspect-square bg-mirage-border-primary/30 rounded-xl animate-pulse flex items-center justify-center">
+                  <div className="w-8 h-8 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: 'rgb(217 119 6)' }} />
                 </div>
               ) : (
-                <div className="aspect-square border-2 border-dashed border-amber-300 rounded-xl flex items-center justify-center opacity-50">
-                  <Book className="h-8 w-8 text-amber-400" />
+                <div className="aspect-square border-2 border-dashed rounded-xl flex items-center justify-center opacity-50" style={{ borderColor: 'rgb(217 119 6)' }}>
+                  <Book className="h-8 w-8" style={{ color: 'rgb(217 119 6)' }} />
                 </div>
               )}
             </div>
@@ -239,11 +259,11 @@ export function BookGrid({ books, loading = false }: { books?: BookWithRelations
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
         {Array.from({ length: 12 }).map((_, i) => (
           <Card key={i} className="animate-pulse">
-            <div className="aspect-square bg-amber-200/30 rounded-t-xl" />
+            <div className="aspect-square bg-mirage-border-primary/30 rounded-t-xl" />
             <CardContent className="p-4">
-              <div className="h-4 bg-amber-200/30 rounded mb-2" />
-              <div className="h-3 bg-amber-200/30 rounded mb-2" />
-              <div className="h-3 bg-amber-200/30 rounded w-2/3" />
+              <div className="h-4 bg-mirage-border-primary/30 rounded mb-2" />
+              <div className="h-3 bg-mirage-border-primary/30 rounded mb-2" />
+              <div className="h-3 bg-mirage-border-primary/30 rounded w-2/3" />
             </CardContent>
           </Card>
         ))}
@@ -253,7 +273,7 @@ export function BookGrid({ books, loading = false }: { books?: BookWithRelations
 
   if (!books?.length) {
     return (
-      <div className="flex flex-col items-center justify-center h-64 text-amber-600">
+      <div className="flex flex-col items-center justify-center h-64 text-mirage-text-tertiary">
         <Book className="h-16 w-16 mb-4 opacity-50" />
         <h3 className="text-lg font-semibold mb-2">No books found</h3>
         <p className="text-sm text-center max-w-md">

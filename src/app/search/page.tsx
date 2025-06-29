@@ -3,23 +3,18 @@
 import { useState, useMemo, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/lib/auth-context'
-import { useLanguages, useGenres, useTags, useTagsByGenre, useModels } from '@/lib/queries'
+import { useLanguages, useGenres, useTagsByGenre, useModels } from '@/lib/queries'
 import { useMutation } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import { BookSearchResultCard } from '@/components/book-search-result-card'
 import { Search, Sparks, Book, ArrowLeft, ArrowRight, Filter, WarningTriangle, Refresh } from 'iconoir-react'
 import { toast } from 'sonner'
-import { Database } from '@/lib/database.types'
 
-// Use database types for better type safety and consistent naming
-type DatabaseSearchResult = Database['public']['Functions']['get_search_results']['Returns'][0]
-
-// Transform database result to frontend-friendly format
 type SearchResultBook = {
   id: string
   title: string
@@ -80,7 +75,7 @@ function SearchPageContent() {
   const [currentPage, setCurrentPage] = useState(1)
   const [isMobileFiltersOpen, setIsMobileFiltersOpen] = useState(false)
   const [isInitialLoad, setIsInitialLoad] = useState(true)
-  
+
   // Track the search parameters that correspond to the current paginated results
   const [paginatedSearchState, setPaginatedSearchState] = useState<PaginatedSearchState | null>(null)
 
@@ -114,7 +109,7 @@ function SearchPageContent() {
 
     // Validate genre exists
     const validGenre = genres.find(g => g.slug === urlGenre)
-    
+
     // Find the default model directly from models array
     const modelToUse = defaultModel
 
@@ -124,12 +119,12 @@ function SearchPageContent() {
       setSelectedGenre(validGenre ? urlGenre : (genres[0]?.slug || ''))
       setSelectedTags(urlTags)
       setCurrentPage(urlPage)
-      
+
       // Set the selected model too
       if (modelToUse) {
         setSelectedModel(modelToUse)
       }
-      
+
       // If we have valid search parameters and a model, trigger the search
       if (validGenre && modelToUse) {
         searchMutation.mutate({
@@ -154,7 +149,7 @@ function SearchPageContent() {
     page: number
   }) => {
     const urlParams = new URLSearchParams()
-    
+
     if (params.query && params.query.trim()) {
       urlParams.set('q', params.query.trim())
     }
@@ -169,23 +164,23 @@ function SearchPageContent() {
     const newURL = `/search${urlParams.toString() ? '?' + urlParams.toString() : ''}`
     router.push(newURL, { scroll: false })
   }
-  
+
   // Get the genre ID for selected genre (only when genres are loaded)
   const selectedGenreData = useMemo(() => {
     return genres?.find(g => g.slug === selectedGenre)
   }, [genres, selectedGenre])
-  
+
   const { data: genreTags } = useTagsByGenre(selectedGenreData?.id)
 
   // Use genre-specific tags if available, fallback to all tags
   const availableTags = useMemo(() => {
     if (!selectedGenre) return []
-    
+
     // Use genre-specific tags if available, otherwise fallback to all tags
     if (genreTags && genreTags.length > 0) {
       return genreTags
     }
-    
+
     // Fallback to all active tags if no genre-specific tags found
     return []
   }, [selectedGenre, genreTags])
@@ -193,7 +188,7 @@ function SearchPageContent() {
   // Check if current form state differs from paginated search state
   const hasSearchParametersChanged = useMemo(() => {
     if (!paginatedSearchState || currentPage === 1) return false
-    
+
     return (
       searchQuery.trim() !== paginatedSearchState.freeText ||
       selectedGenre !== paginatedSearchState.genreSlug ||
@@ -205,7 +200,7 @@ function SearchPageContent() {
   // Reset to paginated search state
   const resetToPaginatedSearch = () => {
     if (!paginatedSearchState) return
-    
+
     setSearchQuery(paginatedSearchState.freeText)
     setSelectedGenre(paginatedSearchState.genreSlug)
     setSelectedTags([...paginatedSearchState.tagSlugs])
@@ -222,7 +217,7 @@ function SearchPageContent() {
   // Handle page changes
   const handlePageChange = (newPage: number) => {
     setCurrentPage(newPage)
-    
+
     // Update URL with new page
     if (paginatedSearchState) {
       updateURL({
@@ -245,8 +240,8 @@ function SearchPageContent() {
   }
 
   const handleTagToggle = (tagSlug: string) => {
-    setSelectedTags(prev => 
-      prev.includes(tagSlug) 
+    setSelectedTags(prev =>
+      prev.includes(tagSlug)
         ? prev.filter(t => t !== tagSlug)
         : [...prev, tagSlug]
     )
@@ -278,7 +273,7 @@ function SearchPageContent() {
         tagSlugs: [...variables.tagSlugs],
         modelId: variables.modelId
       })
-      
+
       if (data.cached) {
         toast.success(`Found cached results for page ${variables.pageNumber} - no credits used!`)
       } else {
@@ -332,17 +327,17 @@ function SearchPageContent() {
     return (
       <div className="container mx-auto px-4 py-8">
         <div className="max-w-2xl mx-auto text-center">
-          <div className="bg-white/20 dark:bg-transparent backdrop-blur-sm rounded-3xl p-8 border border-amber-200/30 dark:border-amber-200/40">
-            <Book className="h-16 w-16 mx-auto mb-4 text-amber-600 dark:text-amber-300" />
-            <h1 className="text-2xl font-bold text-slate-800 dark:text-amber-100 mb-4">
+          <div className="bg-mirage-bg-secondary/20 backdrop-blur-sm rounded-3xl p-8 border border-mirage-border-primary/30">
+            <Book className="h-16 w-16 mx-auto mb-4 text-mirage-accent-primary" />
+            <h1 className="text-2xl font-bold text-mirage-text-primary mb-4">
               Authentication Required
             </h1>
-            <p className="text-slate-600 dark:text-amber-50 mb-6">
+            <p className="text-mirage-text-tertiary mb-6">
               Please sign in to access the Search feature.
             </p>
-            <Button 
-              onClick={() => window.location.href = '/'} 
-              className="bg-amber-600 hover:bg-amber-700 text-white"
+            <Button
+              onClick={() => window.location.href = '/'}
+              className="bg-mirage-accent-primary hover:bg-mirage-accent-hover text-white"
             >
               Go Home
             </Button>
@@ -353,13 +348,38 @@ function SearchPageContent() {
   }
 
   return (
-    <div className="flex h-[calc(100vh-4rem)] relative bg-slate-100/30 dark:bg-slate-900/30 p-4 gap-4">
-      {/* Mobile Filter Button */}
+    <div 
+      className="flex h-[calc(100vh-4rem)] relative bg-mirage-gradient p-4 gap-4"
+      style={{
+        backgroundImage: `url('/marble_texture.png')`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat',
+        backgroundBlendMode: 'overlay'
+      }}
+    >
+      {/* Marble texture overlay */}
+      <div 
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          backgroundImage: `url('/marble_texture.png')`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat',
+          opacity: 0.24
+        }}
+      />
+            {/* Mobile Filter Button */}
       <Button
         onClick={() => setIsMobileFiltersOpen(true)}
-        className="md:hidden fixed top-24 left-4 z-40 h-10 w-10 p-0 bg-amber-600 hover:bg-amber-700 rounded-full shadow-lg"
+        className="md:hidden fixed top-24 left-4 z-40 h-10 w-10 p-0 rounded-full shadow-lg"
+        style={{
+          backgroundColor: 'rgb(217 119 6)',
+          borderColor: 'rgb(217 119 6)',
+          color: 'white'
+        }}
       >
-        <Filter className="h-5 w-5" />
+        <Filter className="h-5 w-5" style={{ color: 'white' }} />
       </Button>
 
       {/* Mobile Overlay */}
@@ -371,120 +391,120 @@ function SearchPageContent() {
       <div className={`
         w-72 flex-shrink-0 overflow-y-auto overflow-x-hidden
         md:relative md:block md:translate-x-0
-        ${isMobileFiltersOpen 
-          ? 'fixed inset-y-0 left-0 z-50 translate-x-0 transition-transform duration-300 ease-out md:transition-none' 
+        ${isMobileFiltersOpen
+          ? 'fixed inset-y-0 left-0 z-50 translate-x-0 transition-transform duration-300 ease-out md:transition-none'
           : 'fixed inset-y-0 left-0 -translate-x-full transition-transform duration-300 ease-out md:transition-none md:translate-x-0'
         }
       `}>
-        <Card className="h-full rounded-none md:rounded-xl bg-white/95 dark:bg-slate-800/95 backdrop-blur-sm border border-amber-200/50 dark:border-amber-200/30 shadow-lg">
+        <Card className="h-full rounded-none md:rounded-xl bg-white/95 backdrop-blur-md border border-mirage-border-primary shadow-xl">
           <CardContent className="p-4 pt-8 h-full">
-          {/* Mobile Close Button */}
-          <div className="md:hidden flex justify-between items-center mb-4">
-            <h2 className="text-lg font-semibold text-slate-800 dark:text-amber-100">
+            {/* Mobile Close Button */}
+            <div className="md:hidden flex justify-between items-center mb-4">
+              <h2 className="text-lg font-semibold text-mirage-text-primary">
+                Filters
+              </h2>
+              <Button
+                onClick={() => setIsMobileFiltersOpen(false)}
+                variant="ghost"
+                className="h-8 w-8 p-0"
+              >
+                ×
+              </Button>
+            </div>
+
+            <h2 className="hidden md:block text-lg font-semibold text-mirage-text-primary mb-6">
               Filters
             </h2>
-            <Button
-              onClick={() => setIsMobileFiltersOpen(false)}
-              variant="ghost"
-              className="h-8 w-8 p-0"
-            >
-              ×
-            </Button>
-          </div>
 
-          <h2 className="hidden md:block text-lg font-semibold text-slate-800 dark:text-amber-100 mb-6">
-            Filters
-          </h2>
-          
-          {/* Search Parameters Changed Warning */}
-          {hasSearchParametersChanged && (
-            <div className="mb-6 p-3 bg-amber-50/80 dark:bg-amber-900/20 border border-amber-200/50 dark:border-amber-300/30 rounded-lg">
-              <div className="flex items-start space-x-2">
-                <WarningTriangle className="h-4 w-4 text-amber-600 dark:text-amber-300 mt-0.5 flex-shrink-0" />
-                <div className="space-y-2">
-                  <p className="text-xs text-amber-800 dark:text-amber-200 font-medium">
-                    Search parameters changed
-                  </p>
-                  <p className="text-xs text-amber-700 dark:text-amber-300">
-                    You're viewing page {currentPage} of a different search. Search again from page 1 or reset to continue pagination.
-                  </p>
-                  <div className="flex space-x-2">
-                    <Button
-                      onClick={resetToPaginatedSearch}
-                      variant="outline"
-                      size="sm"
-                      className="h-7 px-2 text-xs bg-white/80 dark:bg-amber-950/20 border-amber-300/50 dark:border-amber-300/30 text-amber-700 dark:text-amber-300"
-                    >
-                      <Refresh className="h-3 w-3 mr-1" />
-                      Reset
-                    </Button>
+            {/* Search Parameters Changed Warning */}
+            {hasSearchParametersChanged && (
+              <div className="mb-6 p-3 bg-mirage-bg-tertiary/80 border border-mirage-border-primary/50 rounded-lg">
+                <div className="flex items-start space-x-2">
+                  <WarningTriangle className="h-4 w-4 text-mirage-accent-primary mt-0.5 flex-shrink-0" />
+                  <div className="space-y-2">
+                    <p className="text-xs text-mirage-text-secondary font-medium">
+                      Search parameters changed
+                    </p>
+                    <p className="text-xs text-mirage-text-tertiary">
+                      You're viewing page {currentPage} of a different search. Search again from page 1 or reset to continue pagination.
+                    </p>
+                    <div className="flex space-x-2">
+                      <Button
+                        onClick={resetToPaginatedSearch}
+                        variant="outline"
+                        size="sm"
+                        className="h-7 px-2 text-xs bg-white/90 border-mirage-border-primary text-mirage-text-tertiary"
+                      >
+                        <Refresh className="h-3 w-3 mr-1" />
+                        Reset
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          )}
-          
-          <div className="space-y-4">
-            {/* Language Selection */}
-            <div className="space-y-2">
-              <Label className="text-sm font-medium text-slate-700 dark:text-amber-200">Language</Label>
-              <Select value={selectedLanguage} onValueChange={setSelectedLanguage}>
-                <SelectTrigger className="h-9 text-sm bg-white/80 dark:bg-amber-950/20 border-amber-200/50 dark:border-amber-200/30 !w-full min-w-0">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {languages?.map((lang) => (
-                    <SelectItem key={lang.code} value={lang.code} className="text-sm">
-                      {lang.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            )}
 
-            {/* Genre Selection */}
-            <div className="space-y-2">
-              <Label className="text-sm font-medium text-slate-700 dark:text-amber-200">Genre *</Label>
-              <Select value={selectedGenre} onValueChange={handleGenreChange}>
-                <SelectTrigger className="h-9 text-sm bg-white/80 dark:bg-amber-950/20 border-amber-200/50 dark:border-amber-200/30 !w-full min-w-0">
-                  <SelectValue placeholder="Select a genre" />
-                </SelectTrigger>
-                <SelectContent>
-                  {genres?.map((genre) => (
-                    <SelectItem key={genre.slug} value={genre.slug} className="text-sm">
-                      {genre.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            <div className="space-y-4">
+              {/* Language Selection */}
+              <div className="space-y-2">
+                <Label className="text-sm font-medium text-mirage-text-secondary">Language</Label>
+                <Select value={selectedLanguage} onValueChange={setSelectedLanguage}>
+                  <SelectTrigger className="h-9 text-sm bg-white/90 border-mirage-border-primary !w-full min-w-0">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {languages?.map((lang) => (
+                      <SelectItem key={lang.code} value={lang.code} className="text-sm">
+                        {lang.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-            {/* Model Selection */}
-            <div className="space-y-2">
-              <Label className="text-sm font-medium text-slate-700 dark:text-amber-200">AI Model</Label>
-              <Select 
-                value={selectedModel?.toString() || ''} 
-                onValueChange={(value) => setSelectedModel(parseInt(value))}
-              >
-                <SelectTrigger className="h-9 text-sm bg-white/80 dark:bg-amber-950/20 border-amber-200/50 dark:border-amber-200/30 !w-full min-w-0">
-                  <SelectValue placeholder="Select a model" />
-                </SelectTrigger>
-                <SelectContent className="max-w-80">
-                  {models?.map((model) => (
-                    <SelectItem key={model.id} value={model.id.toString()} className="text-sm max-w-80">
-                      <span className="truncate">
-                        {model.model_domains?.label} - {model.name}
-                      </span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+              {/* Genre Selection */}
+              <div className="space-y-2">
+                <Label className="text-sm font-medium text-mirage-text-secondary">Genre *</Label>
+                <Select value={selectedGenre} onValueChange={handleGenreChange}>
+                  <SelectTrigger className="h-9 text-sm bg-white/90 border-mirage-border-primary !w-full min-w-0">
+                    <SelectValue placeholder="Select a genre" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {genres?.map((genre) => (
+                      <SelectItem key={genre.slug} value={genre.slug} className="text-sm">
+                        {genre.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-            {/* Tags Selection */}
+              {/* Model Selection */}
+              <div className="space-y-2">
+                <Label className="text-sm font-medium text-mirage-text-secondary">AI Model</Label>
+                <Select
+                  value={selectedModel?.toString() || ''}
+                  onValueChange={(value) => setSelectedModel(parseInt(value))}
+                >
+                  <SelectTrigger className="h-9 text-sm bg-white/90 border-mirage-border-primary !w-full min-w-0">
+                    <SelectValue placeholder="Select a model" />
+                  </SelectTrigger>
+                  <SelectContent className="max-w-80">
+                    {models?.map((model) => (
+                      <SelectItem key={model.id} value={model.id.toString()} className="text-sm max-w-80">
+                        <span className="truncate">
+                          {model.model_domains?.label} - {model.name}
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+                          {/* Tags Selection */}
             {selectedGenre && availableTags.length > 0 && (
               <div className="space-y-2">
-                <Label className="text-sm font-medium text-slate-700 dark:text-amber-200">
+                <Label className="text-sm font-medium text-mirage-text-secondary">
                   Tags (optional)
                 </Label>
                 <div className="flex flex-wrap gap-1 max-h-32 overflow-y-auto">
@@ -492,11 +512,15 @@ function SearchPageContent() {
                     <Badge
                       key={tag.slug}
                       variant={selectedTags.includes(tag.slug) ? "default" : "outline"}
-                      className={`cursor-pointer transition-colors text-xs px-2 py-1 ${
-                        selectedTags.includes(tag.slug)
-                          ? "bg-amber-600 text-white hover:bg-amber-700"
-                          : "bg-white/80 dark:bg-amber-950/20 text-slate-700 dark:text-amber-200 hover:bg-white dark:hover:bg-amber-950/40"
-                      }`}
+                      className={`cursor-pointer transition-colors text-xs px-2 py-1 ${selectedTags.includes(tag.slug)
+                          ? ""
+                          : "bg-white/90 text-mirage-text-tertiary hover:bg-white border border-mirage-border-primary"
+                        }`}
+                      style={selectedTags.includes(tag.slug) ? {
+                        backgroundColor: 'rgb(217 119 6)',
+                        borderColor: 'rgb(217 119 6)',
+                        color: 'white'
+                      } : {}}
                       onClick={() => handleTagToggle(tag.slug)}
                     >
                       {tag.label}
@@ -504,7 +528,7 @@ function SearchPageContent() {
                   ))}
                 </div>
               </div>
-            )}
+                          )}
 
             <Button 
               onClick={() => {
@@ -512,35 +536,40 @@ function SearchPageContent() {
                 setIsMobileFiltersOpen(false) // Close mobile filters after search
               }}
               disabled={searchMutation.isPending || !selectedGenre || !selectedModel}
-              className="w-full h-9 text-sm bg-amber-600 hover:bg-amber-700 text-white mt-6"
+              className="w-full h-10 text-sm font-medium mt-6 shadow-lg border-2"
+              style={{
+                backgroundColor: 'rgb(217 119 6)',
+                borderColor: 'rgb(217 119 6)',
+                color: 'white'
+              }}
             >
               {searchMutation.isPending ? (
                 <>
-                  <Sparks className="h-4 w-4 mr-2 animate-spin" />
-                  Searching...
+                  <Sparks className="h-4 w-4 mr-2 animate-spin" style={{ color: 'white' }} />
+                  <span style={{ color: 'white' }}>Searching...</span>
                 </>
               ) : (
                 <>
-                  <Search className="h-4 w-4 mr-2" />
-                  Search
+                  <Search className="h-4 w-4 mr-2" style={{ color: 'white' }} />
+                  <span style={{ color: 'white' }}>Search Books</span>
                 </>
               )}
             </Button>
-          </div>
+            </div>
           </CardContent>
         </Card>
       </div>
 
-            {/* Main Content Area */}
+      {/* Main Content Area */}
       <div className="flex-1 flex flex-col space-y-4">
         {/* Search Header Card */}
-        <Card className="bg-white/95 dark:bg-slate-800/95 backdrop-blur-sm border border-amber-200/50 dark:border-amber-200/30 shadow-lg rounded-xl">
+        <Card className="bg-white/95 backdrop-blur-md border border-mirage-border-primary shadow-xl rounded-xl">
           <CardContent className="p-6">
             <div className="text-center mb-4">
-              <h1 className="text-2xl md:text-3xl font-bold text-slate-900 dark:text-amber-100 mb-2">
+              <h1 className="text-2xl md:text-3xl font-bold text-mirage-text-primary mb-2">
                 Dive into infinity
               </h1>
-              <p className="text-sm text-slate-600 dark:text-amber-50 leading-relaxed">
+              <p className="text-sm text-mirage-text-tertiary leading-relaxed">
                 Describe your ideal book and let it be found within the codex.
               </p>
             </div>
@@ -552,30 +581,34 @@ function SearchPageContent() {
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onKeyPress={handleKeyPress}
                 placeholder="Describe your ideal book... (e.g., A mystery novel set in Victorian London)"
-                className="h-12 text-base bg-white/80 dark:bg-amber-950/20 border-amber-200/50 dark:border-amber-200/30 pr-12"
+                className="h-12 text-base bg-white/90 border-mirage-border-primary pr-12"
                 maxLength={2000}
               />
               <Button
                 onClick={handleSearch}
                 disabled={searchMutation.isPending || !selectedGenre || !selectedModel}
-                className="absolute right-1 top-1 h-10 w-10 p-0 bg-amber-600 hover:bg-amber-700"
+                className="absolute right-1 top-1 h-10 w-10 p-0 shadow-lg border-2 rounded-lg z-10"
+                style={{
+                  backgroundColor: 'rgb(217 119 6)',
+                  borderColor: 'rgb(217 119 6)',
+                  color: 'white'
+                }}
               >
                 {searchMutation.isPending ? (
-                  <Sparks className="h-4 w-4 animate-spin" />
+                  <Sparks className="h-4 w-4 animate-spin" style={{ color: 'white' }} />
                 ) : (
-                  <Search className="h-4 w-4" />
+                  <Search className="h-4 w-4" style={{ color: 'white' }} />
                 )}
               </Button>
-              
+
               {/* Character Count */}
               <div className="flex justify-end mt-1">
-                <span className={`text-xs transition-colors ${
-                  searchQuery.length > 1800 
-                    ? 'text-red-500 dark:text-red-400' 
-                    : searchQuery.length > 1500 
-                    ? 'text-amber-600 dark:text-amber-400' 
-                    : 'text-slate-500 dark:text-amber-200/70'
-                }`}>
+                <span className={`text-xs transition-colors ${searchQuery.length > 1800
+                    ? 'text-red-500'
+                    : searchQuery.length > 1500
+                      ? 'text-mirage-accent-primary'
+                      : 'text-mirage-text-muted'
+                  }`}>
                   {searchQuery.length}/2000
                 </span>
               </div>
@@ -584,118 +617,118 @@ function SearchPageContent() {
         </Card>
 
         {/* Results Card */}
-        <Card className="flex-1 bg-white/95 dark:bg-slate-800/95 backdrop-blur-sm border border-amber-200/50 dark:border-amber-200/30 shadow-lg rounded-xl overflow-hidden">
+        <Card className="flex-1 bg-white/95 backdrop-blur-md border border-mirage-border-primary shadow-xl rounded-xl overflow-hidden">
           <CardContent className="p-0 h-full">
             <div className="h-full overflow-y-auto p-4">
-          {searchMutation.isPending ? (
-            <div className="flex items-center justify-center h-full">
-              <div className="text-center">
-                <div className="relative mb-4">
-                  <Sparks className="h-12 w-12 text-amber-600 dark:text-amber-300 animate-spin mx-auto" />
-                  <div className="absolute inset-0 rounded-full border-2 border-amber-200/30 dark:border-amber-300/30 animate-pulse"></div>
+              {searchMutation.isPending ? (
+                <div className="flex items-center justify-center h-full">
+                  <div className="text-center">
+                    <div className="relative mb-4">
+                      <Sparks className="h-12 w-12 text-mirage-accent-primary animate-spin mx-auto" />
+                      <div className="absolute inset-0 rounded-full border-2 border-mirage-border-primary/30 animate-pulse"></div>
+                    </div>
+                    <h3 className="text-xl font-semibold text-mirage-text-primary mb-2">
+                      Weaving your query into existence...
+                    </h3>
+                  </div>
                 </div>
-                <h3 className="text-xl font-semibold text-slate-800 dark:text-amber-100 mb-2">
-                  Weaving your query into existence...
-                </h3>
-              </div>
-            </div>
-          ) : searchMutation.data ? (
-            <div className="space-y-4">
-              {/* Results Header with Query Context */}
-              <div className="flex flex-col space-y-2">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-xl font-semibold text-slate-800 dark:text-amber-100">
-                    Books (Page {currentPage})
-                  </h2>
-                  <div className="flex items-center space-x-2">
-                    {searchMutation.data.cached && (
-                      <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 text-sm px-2 py-1">
-                        Cached Result
-                      </Badge>
+              ) : searchMutation.data ? (
+                <div className="space-y-4">
+                  {/* Results Header with Query Context */}
+                  <div className="flex flex-col space-y-2">
+                    <div className="flex items-center justify-between">
+                      <h2 className="text-xl font-semibold text-mirage-text-primary">
+                        Books (Page {currentPage})
+                      </h2>
+                      <div className="flex items-center space-x-2">
+                        {searchMutation.data.cached && (
+                          <Badge className="bg-green-100 text-green-800 text-sm px-2 py-1">
+                            Cached Result
+                          </Badge>
+                        )}
+                        <Button
+                          onClick={() => {
+                            const currentURL = window.location.href
+                            navigator.clipboard.writeText(currentURL)
+                            toast.success('Search URL copied to clipboard!')
+                          }}
+                          variant="outline"
+                          size="sm"
+                          className="h-8 px-3 text-xs bg-white/90 border-mirage-border-primary"
+                        >
+                          Share Search
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* Query Context - showing only the parameters that matter for pagination */}
+                    {paginatedSearchState && (
+                      <div className="text-xs text-mirage-text-muted space-y-1">
+                        <div>
+                          <span className="font-medium">Query:</span> {paginatedSearchState.freeText || 'No text query'}
+                        </div>
+                        <div className="flex flex-wrap gap-4">
+                          <span>
+                            <span className="font-medium">Genre:</span> {genres?.find(g => g.slug === paginatedSearchState.genreSlug)?.label}
+                          </span>
+                          {paginatedSearchState.tagSlugs.length > 0 && (
+                            <span>
+                              <span className="font-medium">Tags:</span> {paginatedSearchState.tagSlugs.map(tagSlug =>
+                                availableTags.find(t => t.slug === tagSlug)?.label
+                              ).join(', ')}
+                            </span>
+                          )}
+                        </div>
+                      </div>
                     )}
+                  </div>
+
+                  {/* Book Grid */}
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+                    {searchMutation.data.books.map((book) => (
+                      <BookSearchResultCard key={book.id} book={book} />
+                    ))}
+                  </div>
+
+                  {/* Pagination Controls */}
+                  <div className="flex items-center justify-center space-x-4 pt-4">
                     <Button
-                      onClick={() => {
-                        const currentURL = window.location.href
-                        navigator.clipboard.writeText(currentURL)
-                        toast.success('Search URL copied to clipboard!')
-                      }}
+                      onClick={() => handlePageChange(currentPage - 1)}
+                      disabled={currentPage <= 1 || searchMutation.isPending || hasSearchParametersChanged}
                       variant="outline"
-                      size="sm"
-                      className="h-8 px-3 text-xs bg-white/80 dark:bg-amber-950/20 border-amber-200/50 dark:border-amber-200/30"
+                      className="h-9 px-4 text-sm bg-white/90 border-mirage-border-primary"
                     >
-                      Share Search
+                      <ArrowLeft className="h-4 w-4 mr-1" />
+                      Previous
+                    </Button>
+
+                    <div className="flex items-center space-x-2">
+                      <span className="text-mirage-text-tertiary text-sm font-medium">
+                        Page {currentPage}
+                      </span>
+                    </div>
+
+                    <Button
+                      onClick={() => handlePageChange(currentPage + 1)}
+                      disabled={searchMutation.isPending || hasSearchParametersChanged}
+                      variant="outline"
+                      className="h-9 px-4 text-sm bg-white/90 border-mirage-border-primary"
+                    >
+                      Next
+                      <ArrowRight className="h-4 w-4 ml-1" />
                     </Button>
                   </div>
                 </div>
-                
-                {/* Query Context - showing only the parameters that matter for pagination */}
-                {paginatedSearchState && (
-                  <div className="text-xs text-slate-500 dark:text-amber-200/70 space-y-1">
-                    <div>
-                      <span className="font-medium">Query:</span> {paginatedSearchState.freeText || 'No text query'}
-                    </div>
-                    <div className="flex flex-wrap gap-4">
-                      <span>
-                        <span className="font-medium">Genre:</span> {genres?.find(g => g.slug === paginatedSearchState.genreSlug)?.label}
-                      </span>
-                      {paginatedSearchState.tagSlugs.length > 0 && (
-                        <span>
-                          <span className="font-medium">Tags:</span> {paginatedSearchState.tagSlugs.map(tagSlug => 
-                            availableTags.find(t => t.slug === tagSlug)?.label
-                          ).join(', ')}
-                        </span>
-                      )}
-                    </div>
+              ) : (
+                <div className="flex items-center justify-center h-full">
+                  <div className="text-center">
+                    <Book className="h-16 w-16 mx-auto mb-4 text-mirage-text-light" />
+                    <p className="text-base text-mirage-text-tertiary">
+                      Adjust your parameters and click Search to find books.
+                    </p>
                   </div>
-                )}
-              </div>
-              
-              {/* Book Grid */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-                {searchMutation.data.books.map((book) => (
-                  <BookSearchResultCard key={book.id} book={book} />
-                ))}
-              </div>
-
-              {/* Pagination Controls */}
-              <div className="flex items-center justify-center space-x-4 pt-4">
-                <Button
-                  onClick={() => handlePageChange(currentPage - 1)}
-                  disabled={currentPage <= 1 || searchMutation.isPending || hasSearchParametersChanged}
-                  variant="outline"
-                  className="h-9 px-4 text-sm bg-white/80 dark:bg-amber-950/20 border-amber-200/50 dark:border-amber-200/30"
-                >
-                  <ArrowLeft className="h-4 w-4 mr-1" />
-                  Previous
-                </Button>
-                
-                <div className="flex items-center space-x-2">
-                  <span className="text-slate-600 dark:text-amber-200 text-sm font-medium">
-                    Page {currentPage}
-                  </span>
                 </div>
-
-                <Button
-                  onClick={() => handlePageChange(currentPage + 1)}
-                  disabled={searchMutation.isPending || hasSearchParametersChanged}
-                  variant="outline"
-                  className="h-9 px-4 text-sm bg-white/80 dark:bg-amber-950/20 border-amber-200/50 dark:border-amber-200/30"
-                >
-                  Next
-                  <ArrowRight className="h-4 w-4 ml-1" />
-                </Button>
-              </div>
-            </div>
-          ) : (
-            <div className="flex items-center justify-center h-full">
-              <div className="text-center">
-                <Book className="h-16 w-16 mx-auto mb-4 text-amber-400 dark:text-amber-300" />
-                <p className="text-base text-slate-600 dark:text-amber-50">
-                  Adjust your parameters and click Search to find books.
-                </p>
-              </div>
-            </div>
-          )}
+              )}
             </div>
           </CardContent>
         </Card>
@@ -707,10 +740,10 @@ function SearchPageContent() {
 export default function SearchPage() {
   return (
     <Suspense fallback={
-      <div className="flex h-[calc(100vh-4rem)] items-center justify-center bg-slate-100/30 dark:bg-slate-900/30">
+      <div className="flex h-[calc(100vh-4rem)] items-center justify-center bg-mirage-gradient">
         <div className="text-center">
-          <Sparks className="h-12 w-12 text-amber-600 dark:text-amber-300 animate-spin mx-auto mb-4" />
-          <h3 className="text-xl font-semibold text-slate-800 dark:text-amber-100 mb-2">
+          <Sparks className="h-12 w-12 text-mirage-accent-primary animate-spin mx-auto mb-4" />
+          <h3 className="text-xl font-semibold text-mirage-text-primary mb-2">
             Loading search page...
           </h3>
         </div>

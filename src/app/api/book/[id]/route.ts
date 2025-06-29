@@ -17,7 +17,7 @@ export async function GET(
 
     const supabase = await createSupabaseServerClient()
 
-    // Get book details with author, sections, and edition information
+    // Get book details with author, sections, genre, and edition information
     const { data: book, error: bookError } = await supabase
       .from('books')
       .select(`
@@ -28,6 +28,7 @@ export async function GET(
         cover_url,
         book_cover_prompt,
         primary_language_id,
+        genre_id,
         authors (
           id,
           pen_name,
@@ -36,6 +37,11 @@ export async function GET(
         ),
         languages!books_primary_language_id_fkey (
           code,
+          label
+        ),
+        genres (
+          id,
+          slug,
           label
         )
       `)
@@ -107,6 +113,11 @@ export async function GET(
         stylePrompt: book.authors.style_prompt
       },
       language: book.languages.label,
+      genre: {
+        id: book.genres.id,
+        slug: book.genres.slug,
+        label: book.genres.label
+      },
       sections: sections?.map(section => ({
         title: section.title,
         fromPage: section.from_page,

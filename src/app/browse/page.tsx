@@ -1,13 +1,13 @@
 'use client'
 
 import { Suspense } from 'react'
-import { BookGrid, BookSection } from '@/components/book-grid'
-import { BrowseFilters } from '@/components/browse-filters'
+import { BookSection } from '@/components/book-grid'
 import { RandomizeButton } from '@/components/randomize-button'
-import { Card, CardContent } from '@/components/ui/card'
 import { useAuth } from '@/lib/auth-context'
 import { useUserSearchedBooks, useLatestBooks, useBooksByGenre } from '@/lib/queries'
 import { useGenres } from '@/lib/queries'
+import Link from 'next/link'
+import { ArrowRight } from 'iconoir-react'
 
 export default function BrowsePage() {
   const { user } = useAuth()
@@ -21,38 +21,50 @@ export default function BrowsePage() {
   const topGenres = genres?.slice(0, 4) || []
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-amber-50 via-white to-amber-50">
+    <div className="min-h-screen bg-mirage-gradient">
       <div className="container mx-auto px-4 py-8 space-y-12">
         {/* Header Section */}
-        <section className="text-center space-y-4">
+        <section className="text-center space-y-6">
           <div className="flex items-center justify-between">
             <div className="text-left">
-              <h1 className="text-4xl font-bold text-amber-900 mb-2">
+              <h1 className="text-4xl font-bold text-mirage-text-primary mb-2">
                 Browse Library
               </h1>
-              <p className="text-amber-700 text-lg">
+              <p className="text-mirage-text-tertiary text-lg">
                 Discover books from the infinite collection
               </p>
             </div>
-            <RandomizeButton variant="outline" />
+            <div className="flex items-center">
+              <RandomizeButton 
+                variant="default"
+                className="h-12 px-6 text-base font-medium shadow-lg hover:shadow-xl transition-all duration-200"
+                style={{
+                  backgroundColor: 'rgb(217 119 6)',
+                  borderColor: 'rgb(217 119 6)',
+                  color: 'white'
+                }}
+              />
+            </div>
           </div>
         </section>
 
         {/* User's Searched Books - Only show if user is logged in */}
         {user && (
           <Suspense fallback={<BookSectionSkeleton title="Your Recent Discoveries" />}>
-            <BookSection 
+            <ClickableBookSection 
               title="Your Recent Discoveries"
               queryResult={userBooksQuery}
+              href="/browse/recent"
             />
           </Suspense>
         )}
 
         {/* Latest Releases */}
         <Suspense fallback={<BookSectionSkeleton title="Latest Releases" />}>
-          <BookSection 
+          <ClickableBookSection 
             title="Latest Releases"
             queryResult={latestBooksQuery}
+            href="/browse/latest"
           />
         </Suspense>
 
@@ -60,30 +72,48 @@ export default function BrowsePage() {
         {topGenres.map((genre) => (
           <GenreSection 
             key={genre.id} 
+            genreId={genre.id}
             genreSlug={genre.slug} 
             genreLabel={genre.label} 
           />
         ))}
 
-        {/* Browse Filters for Advanced Search */}
-        <section className="bg-white/60 backdrop-blur-sm rounded-2xl border border-amber-200/50 shadow-lg">
-          <div className="p-6">
-            <h2 className="text-2xl font-bold text-amber-900 mb-4">
-              Advanced Browse
+        {/* All Genres Grid */}
+        <section className="space-y-6">
+          <div className="flex items-center justify-between">
+            <h2 className="text-2xl font-bold text-mirage-text-primary">
+              Browse by Genre
             </h2>
-            <p className="text-amber-700 mb-6">
-              Use filters to find exactly what you're looking for
-            </p>
-            
-            <Suspense fallback={<BrowseFilters />}>
-              <BrowseFilters />
-            </Suspense>
-
-            <div className="mt-8">
-              <Suspense fallback={<BookGridSkeleton />}>
-                <BookGrid />
-              </Suspense>
-            </div>
+            <Link 
+              href="/browse/genres"
+              className="flex items-center text-sm font-medium transition-colors duration-200 hover:opacity-80"
+              style={{ color: 'rgb(217 119 6)' }}
+            >
+              View All
+              <ArrowRight className="h-4 w-4 ml-1" />
+            </Link>
+          </div>
+          
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+            {genres?.map((genre) => (
+              <Link 
+                key={genre.id}
+                href={`/browse/genre/${genre.slug}`}
+                className="group"
+              >
+                <div className="bg-white/90 backdrop-blur-md border border-mirage-border-primary rounded-xl p-4 text-center hover:shadow-lg hover:scale-105 transition-all duration-200 cursor-pointer">
+                  <div 
+                    className="w-12 h-12 rounded-full mx-auto mb-3 flex items-center justify-center text-white text-lg font-bold"
+                    style={{ backgroundColor: 'rgb(217 119 6)' }}
+                  >
+                    {genre.label.charAt(0)}
+                  </div>
+                  <h3 className="text-sm font-medium text-mirage-text-primary group-hover:text-mirage-text-secondary transition-colors duration-200">
+                    {genre.label}
+                  </h3>
+                </div>
+              </Link>
+            ))}
           </div>
         </section>
       </div>
@@ -91,15 +121,55 @@ export default function BrowsePage() {
   )
 }
 
+// Clickable Book Section component with routing
+function ClickableBookSection({ 
+  title, 
+  queryResult, 
+  href 
+}: { 
+  title: string
+  queryResult: any
+  href: string 
+}) {
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-bold text-mirage-text-primary">{title}</h2>
+        <Link 
+          href={href}
+          className="flex items-center text-sm font-medium transition-colors duration-200 hover:opacity-80"
+          style={{ color: 'rgb(217 119 6)' }}
+        >
+          View All
+          <ArrowRight className="h-4 w-4 ml-1" />
+        </Link>
+      </div>
+             <BookSection 
+         title=""
+         queryResult={queryResult}
+       />
+    </div>
+  )
+}
+
 // Genre-specific section component
-function GenreSection({ genreSlug, genreLabel }: { genreSlug: string, genreLabel: string }) {
+function GenreSection({ 
+  genreId, 
+  genreSlug, 
+  genreLabel 
+}: { 
+  genreId: string
+  genreSlug: string
+  genreLabel: string 
+}) {
   const genreBooksQuery = useBooksByGenre(genreSlug, 10)
   
   return (
     <Suspense fallback={<BookSectionSkeleton title={genreLabel} />}>
-      <BookSection 
+      <ClickableBookSection 
         title={genreLabel}
         queryResult={genreBooksQuery}
+        href={`/browse/genre/${genreSlug}`}
       />
     </Suspense>
   )
@@ -109,36 +179,21 @@ function GenreSection({ genreSlug, genreLabel }: { genreSlug: string, genreLabel
 function BookSectionSkeleton({ title }: { title: string }) {
   return (
     <div className="space-y-4">
-      <h2 className="text-xl font-bold text-amber-900">{title}</h2>
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-bold text-mirage-text-primary">{title}</h2>
+        <div className="h-5 w-16 bg-mirage-border-primary/30 rounded animate-pulse" />
+      </div>
       <div className="flex space-x-4 overflow-hidden">
         {Array.from({ length: 6 }).map((_, i) => (
           <div key={i} className="flex-none w-48">
-            <div className="aspect-square bg-amber-200/30 rounded-xl animate-pulse mb-3" />
+            <div className="aspect-square bg-mirage-border-primary/30 rounded-xl animate-pulse mb-3" />
             <div className="space-y-2">
-              <div className="h-4 bg-amber-200/30 rounded animate-pulse" />
-              <div className="h-3 bg-amber-200/30 rounded w-2/3 animate-pulse" />
+              <div className="h-4 bg-mirage-border-primary/30 rounded animate-pulse" />
+              <div className="h-3 bg-mirage-border-primary/30 rounded w-2/3 animate-pulse" />
             </div>
           </div>
         ))}
       </div>
-    </div>
-  )
-}
-
-// Loading skeleton for the book grid
-function BookGridSkeleton() {
-  return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
-      {Array.from({ length: 12 }).map((_, i) => (
-        <Card key={i} className="animate-pulse">
-          <div className="aspect-square bg-amber-200/30 rounded-t-xl" />
-          <CardContent className="p-4">
-            <div className="h-4 bg-amber-200/30 rounded mb-2" />
-            <div className="h-3 bg-amber-200/30 rounded mb-2" />
-            <div className="h-3 bg-amber-200/30 rounded w-2/3" />
-          </CardContent>
-        </Card>
-      ))}
     </div>
   )
 } 

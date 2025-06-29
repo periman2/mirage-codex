@@ -61,11 +61,15 @@ export default function HomePage() {
               </h1>
               {/* Reduced gap and added subtle divider */}
               <div className="mx-2 md:mx-3 lg:mx-4 flex items-center">
-                <div className="w-px h-8 md:h-16 lg:h-20 bg-[#B89C51] opacity-30"></div>
+                <div className="w-px h-8 md:h-16 lg:h-20 opacity-30" style={{ backgroundColor: 'rgb(217 119 6)' }}></div>
               </div>
               <h1
-                className="text-4xl md:text-7xl lg:text-8xl font-bold text-[#B89C51] dark:text-[#D4AF37] leading-tight tracking-wide"
-                style={{ fontFamily: 'var(--font-playfair-display), serif', letterSpacing: '0.1em' }}
+                className="text-4xl md:text-7xl lg:text-8xl font-bold leading-tight tracking-wide"
+                style={{ 
+                  fontFamily: 'var(--font-playfair-display), serif', 
+                  letterSpacing: '0.1em',
+                  color: 'rgb(217 119 6)'
+                }}
               >
                 Codex
               </h1>
@@ -75,28 +79,31 @@ export default function HomePage() {
             <div className="mt-4 md:mt-6 space-y-3">
               {/* Top divider */}
               <div className="flex items-center justify-center">
-                <div className="h-px bg-[#B89C51] opacity-20 w-8"></div>
+                <div className="h-px opacity-20 w-8" style={{ backgroundColor: 'rgb(217 119 6)' }}></div>
               </div>
               
               <p
                 className="text-lg md:text-xl lg:text-2xl text-slate-600 dark:text-amber-50/90 leading-relaxed font-light italic"
                 style={{ fontFamily: 'var(--font-playfair-display), serif' }}
               >
-                <span className="text-xl md:text-2xl lg:text-3xl text-[#B89C51] dark:text-[#D4AF37]">"</span>
+                <span className="text-xl md:text-2xl lg:text-3xl" style={{ color: 'rgb(217 119 6)' }}>"</span>
                 The simulacrum of a literary universe
-                <span className="text-xl md:text-2xl lg:text-3xl text-[#B89C51] dark:text-[#D4AF37]">"</span>
+                <span className="text-xl md:text-2xl lg:text-3xl" style={{ color: 'rgb(217 119 6)' }}>"</span>
               </p>
               
               {/* Bottom divider */}
               <div className="flex items-center justify-center">
-                <div className="h-px bg-[#B89C51] opacity-20 w-8"></div>
+                <div className="h-px opacity-20 w-8" style={{ backgroundColor: 'rgb(217 119 6)' }}></div>
               </div>
             </div>
           </div>
 
           {/* Poetic Description */}
           <div className="max-w-lg mx-auto space-y-3 md:space-y-4">
-            <div className="backdrop-blur-sm bg-transparent rounded-2xl p-4 md:p-6 border border-[#B89C51]/10 dark:border-[#B89C51]/30">
+            <div 
+              className="backdrop-blur-sm bg-transparent rounded-2xl p-4 md:p-6 border"
+              style={{ borderColor: 'rgba(217, 119, 6, 0.1)' }}
+            >
               <p className="text-base md:text-lg text-slate-800 dark:text-amber-50 leading-relaxed max-w-2xl mx-auto">
                 A living archive born from the collective imagination. Each query conjures phantom volumes, existing only in the space between dream and ink.
               </p>
@@ -157,36 +164,48 @@ function ModeCard({ mode, title, subtitle, icon, description, requiresAuth, isPr
       className={`
         group relative overflow-hidden
         ${isPrimary 
-          ? 'bg-[#B89C51] hover:bg-[#A76700] text-white' 
+          ? 'text-white' 
           : 'bg-amber-50/5 dark:bg-transparent hover:bg-amber-50/8 dark:hover:bg-transparent text-slate-600 dark:text-amber-100'
         }
         backdrop-blur-sm
         rounded-xl
-        ${isPrimary 
-          ? 'border border-[#A76700]/60' 
-          : 'border border-[#A76700]/60 dark:border-amber-200/60'
-        }
+        border
         p-4 md:p-6
         text-center
         transition-all duration-500 ease-out
         hover:scale-102 hover:shadow-2xl 
         hover:shadow-amber-900/8 dark:hover:shadow-amber-400/8
         ${!isPrimary && 'hover:border-amber-800/80 dark:hover:border-amber-100/80'}
-        focus:outline-none focus-visible:ring-2 focus-visible:ring-[#B89C51]/60
+        focus:outline-none focus-visible:ring-2
         min-h-[140px] md:min-h-[160px]
         flex flex-col items-center justify-center
         ${isPrimary ? 'min-h-[160px] md:min-h-[180px]' : ''}
       `}
+      style={{
+        backgroundColor: isPrimary ? 'rgb(217 119 6)' : undefined,
+        borderColor: isPrimary ? 'rgba(217, 119, 6, 0.6)' : 'rgba(217, 119, 6, 0.6)',
+        ...(isPrimary && {
+          ':hover': { backgroundColor: 'rgb(180 83 9)' }
+        })
+      }}
     >
       {/* Radial glow effect on hover */}
-      <div className="absolute inset-0 opacity-0 group-hover:opacity-10 transition-opacity duration-500 ease-out bg-gradient-radial from-[#B89C51] via-transparent to-transparent rounded-xl" />
+      <div 
+        className="absolute inset-0 opacity-0 group-hover:opacity-10 transition-opacity duration-500 ease-out rounded-xl"
+        style={{
+          background: 'radial-gradient(circle, rgb(217 119 6), transparent, transparent)'
+        }}
+      />
 
       {/* Icon */}
-      <div className={`mb-2 md:mb-3 transition-all duration-500 ease-out group-hover:scale-105 group-hover:-translate-y-2 ${
-        isPrimary 
-          ? 'text-white group-hover:text-amber-100' 
-          : 'text-[#B89C51] dark:text-[#B89C51] group-hover:text-[#D4AF37]'
-      }`}>
+      <div 
+        className={`mb-2 md:mb-3 transition-all duration-500 ease-out group-hover:scale-105 group-hover:-translate-y-2 ${
+          isPrimary 
+            ? 'text-white group-hover:text-amber-100' 
+            : ''
+        }`}
+        style={!isPrimary ? { color: 'rgb(217 119 6)' } : {}}
+      >
         <div className="w-8 h-8 md:w-10 md:h-10">
           {icon}
         </div>

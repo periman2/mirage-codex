@@ -26,6 +26,11 @@ interface BookData {
     bio: string | null
   }
   language: string
+  genre: {
+    id: string
+    slug: string
+    label: string
+  }
   sections: Array<{
     title: string
     fromPage: number
@@ -408,10 +413,10 @@ export default function BookDetailPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-amber-50 via-white to-amber-50 flex items-center justify-center">
+      <div className="min-h-screen bg-mirage-gradient flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-amber-600 mx-auto"></div>
-          <p className="mt-4 text-amber-800">Loading book...</p>
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-mirage-accent-primary mx-auto"></div>
+          <p className="mt-4 text-mirage-text-secondary">Loading book...</p>
         </div>
       </div>
     )
@@ -419,23 +424,28 @@ export default function BookDetailPage() {
 
   if (!book) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-amber-50 via-white to-amber-50 flex items-center justify-center">
+      <div className="min-h-screen bg-mirage-gradient flex items-center justify-center">
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-amber-900 mb-4">Book Not Found</h1>
-          <p className="text-amber-700">The requested book could not be found.</p>
+          <h1 className="text-2xl font-bold text-mirage-text-primary mb-4">Book Not Found</h1>
+          <p className="text-mirage-text-tertiary">The requested book could not be found.</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="h-[calc(100vh-4rem)] bg-gradient-to-br from-amber-50 via-white to-amber-50 relative">
+    <div className="h-[calc(100vh-4rem)] bg-mirage-gradient relative">
       {/* Mobile Book Info Button */}
-      <Button
+                    <Button
         onClick={() => setIsMobileBookInfoOpen(true)}
-        className="md:hidden fixed top-24 left-4 z-40 h-10 w-10 p-0 bg-amber-600 hover:bg-amber-700 rounded-full shadow-lg"
+        className="md:hidden fixed top-24 left-4 z-40 h-10 w-10 p-0 rounded-full shadow-lg"
+        style={{
+          backgroundColor: 'rgb(217 119 6)',
+          borderColor: 'rgb(217 119 6)',
+          color: 'white'
+        }}
       >
-        <Book className="h-5 w-5" />
+        <Book className="h-5 w-5" style={{ color: 'white' }} />
       </Button>
 
       {/* Mobile Overlay */}
@@ -446,7 +456,7 @@ export default function BookDetailPage() {
       <div className="flex h-full">
         {/* Left Sidebar - Book Information */}
         <div className={`
-          w-80 h-full bg-white/80 backdrop-blur-sm border-r border-amber-200 shadow-lg
+          w-80 h-full bg-white/95 backdrop-blur-md border-r border-mirage-border-primary shadow-xl
           md:relative md:block md:translate-x-0
           ${isMobileBookInfoOpen
             ? 'fixed inset-y-0 left-0 z-50 translate-x-0 transition-transform duration-300 ease-out md:transition-none'
@@ -455,10 +465,10 @@ export default function BookDetailPage() {
         `}>
           <div className="h-full overflow-y-auto">
             {/* Mobile Close Button */}
-            <div className="md:hidden flex justify-between items-center p-4 border-b border-amber-200/30">
-              <h2 className="text-lg font-semibold text-amber-900">
-                Book Info
-              </h2>
+                          <div className="md:hidden flex justify-between items-center p-4 border-b border-mirage-border-primary">
+                <h2 className="text-lg font-semibold text-mirage-text-primary">
+                  Book Info
+                </h2>
               <Button
                 onClick={() => setIsMobileBookInfoOpen(false)}
                 variant="ghost"
@@ -480,59 +490,67 @@ export default function BookDetailPage() {
 
               {/* Book Details */}
               <div className="space-y-4">
-                <h1 className="text-2xl font-bold text-amber-900 leading-tight">
+                <h1 className="text-2xl font-bold text-mirage-text-primary leading-tight">
                   {book.title}
                 </h1>
-                <p className="text-base text-amber-700 font-medium">
+                <p className="text-base text-mirage-text-tertiary font-medium">
                   by {book.author.penName}
                 </p>
-                <p className="text-sm text-amber-600">
-                  {book.pageCount} pages • {book.language}
-                </p>
-                <p className="text-sm text-amber-600">
+                <div className="space-y-1">
+                  <p className="text-sm text-mirage-text-muted">
+                    {book.pageCount} pages • {book.language}
+                  </p>
+                  <p className="text-sm">
+                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium text-white" style={{ backgroundColor: 'rgb(217 119 6)' }}>
+                      {book.genre.label}
+                    </span>
+                  </p>
+                </div>
+                <p className="text-sm text-mirage-text-muted">
                   Generated with {book.edition.modelName}
                 </p>
               </div>
 
               {/* Book Summary */}
               <Dialog>
-                <div className="bg-amber-50/50 rounded-lg p-4 space-y-3">
+                <div className="bg-mirage-bg-tertiary/50 rounded-lg p-4 space-y-3">
                   <div className="flex items-center justify-between">
-                    <h3 className="text-base font-semibold text-amber-900">Summary</h3>
+                    <h3 className="text-base font-semibold text-mirage-text-primary">Summary</h3>
                     <DialogTrigger asChild>
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="h-6 w-6 p-0 text-amber-600 hover:text-amber-800"
+                        className="h-6 w-6 p-0"
+                        style={{ color: 'rgb(217 119 6)' }}
                       >
-                        <Eye className="h-4 w-4" />
+                        <Eye className="h-4 w-4" style={{ color: 'rgb(217 119 6)' }} />
                       </Button>
                     </DialogTrigger>
                   </div>
                   <DialogTrigger asChild>
                     <div className="cursor-pointer">
-                      <p className="text-sm text-amber-800/80 leading-relaxed overflow-hidden" style={{
+                      <p className="text-sm text-mirage-text-secondary/80 leading-relaxed overflow-hidden" style={{
                         display: '-webkit-box',
                         WebkitLineClamp: 3,
                         WebkitBoxOrient: 'vertical'
                       }}>
                         {book.summary}
                       </p>
-                      <p className="text-xs text-amber-600/70 italic mt-2 hover:text-amber-800 transition-colors">
+                      <p className="text-xs text-mirage-text-muted/70 italic mt-2 hover:text-mirage-text-secondary transition-colors">
                         Click to read full summary...
                       </p>
                     </div>
                   </DialogTrigger>
                 </div>
-                <DialogContent className="max-w-2xl bg-white/95 backdrop-blur-sm border border-amber-200/50">
+                <DialogContent className="max-w-2xl bg-white/95 backdrop-blur-md border border-mirage-border-primary shadow-xl">
                   <DialogHeader>
-                    <DialogTitle className="text-xl font-bold text-amber-900">
+                    <DialogTitle className="text-xl font-bold text-mirage-text-primary">
                       {book.title}
                     </DialogTitle>
                   </DialogHeader>
                   <div className="mt-4">
-                    <h4 className="text-lg font-semibold text-amber-800 mb-3">Summary</h4>
-                    <p className="text-base text-amber-900 leading-relaxed">
+                    <h4 className="text-lg font-semibold text-mirage-text-secondary mb-3">Summary</h4>
+                    <p className="text-base text-mirage-text-primary leading-relaxed">
                       {book.summary}
                     </p>
                   </div>
@@ -541,7 +559,7 @@ export default function BookDetailPage() {
 
               {/* Page Info */}
               <div className="text-center">
-                <span className="text-base text-amber-700 font-medium">
+                <span className="text-base text-mirage-text-tertiary font-medium">
                   Page {currentPage} of {book.pageCount}
                 </span>
               </div>
@@ -554,10 +572,12 @@ export default function BookDetailPage() {
                     <Button
                       variant={existingBookmark ? "default" : "outline"}
                       size="default"
-                      className={`w-full flex items-center gap-2 h-10 ${existingBookmark
-                          ? 'bg-amber-600 hover:bg-amber-700 text-white'
-                          : ''
-                        }`}
+                      className="w-full flex items-center gap-2 h-10"
+                      style={existingBookmark ? {
+                        backgroundColor: 'rgb(217 119 6)',
+                        borderColor: 'rgb(217 119 6)',
+                        color: 'white'
+                      } : {}}
                       onClick={handleBookmark}
                       title={existingBookmark?.note ? `Note: ${existingBookmark.note}` : undefined}
                     >
@@ -566,7 +586,7 @@ export default function BookDetailPage() {
                           <BookmarkMinus className="h-4 w-4" />
                           Remove Bookmark
                           {existingBookmark.note && (
-                            <span className="text-xs bg-amber-200 text-amber-800 px-1 py-0.5 rounded ml-1">
+                            <span className="text-xs bg-mirage-border-primary text-mirage-text-secondary px-1 py-0.5 rounded ml-1">
                               📝
                             </span>
                           )}
@@ -579,18 +599,18 @@ export default function BookDetailPage() {
                       )}
                     </Button>
 
-                    <DialogContent className="max-w-md bg-white/95 backdrop-blur-sm border border-amber-200/50">
+                    <DialogContent className="max-w-md bg-white/95 backdrop-blur-md border border-mirage-border-primary shadow-xl">
                       <DialogHeader>
-                        <DialogTitle className="text-lg font-bold text-amber-900">
+                        <DialogTitle className="text-lg font-bold text-mirage-text-primary">
                           Add Bookmark
                         </DialogTitle>
                       </DialogHeader>
                       <div className="space-y-4 mt-4">
                         <div>
-                          <p className="text-sm text-amber-800 mb-3">
+                          <p className="text-sm text-mirage-text-secondary mb-3">
                             Bookmarking page {currentPage} of "{book?.title}"
                           </p>
-                          <Label htmlFor="bookmark-note" className="text-sm font-medium text-amber-900">
+                          <Label htmlFor="bookmark-note" className="text-sm font-medium text-mirage-text-primary">
                             Note (optional)
                           </Label>
                           <Input
@@ -598,10 +618,10 @@ export default function BookDetailPage() {
                             value={bookmarkNote}
                             onChange={(e) => setBookmarkNote(e.target.value)}
                             placeholder="Add a note about this page..."
-                            className="mt-1 bg-white/80 border-amber-200/50"
+                            className="mt-1 bg-white/90 border-mirage-border-primary"
                             maxLength={500}
                           />
-                          <p className="text-xs text-amber-600/70 mt-1">
+                          <p className="text-xs text-mirage-text-muted/70 mt-1">
                             {bookmarkNote.length}/500 characters
                           </p>
                         </div>
@@ -615,7 +635,12 @@ export default function BookDetailPage() {
                           </Button>
                           <Button
                             onClick={createBookmark}
-                            className="flex-1 bg-amber-600 hover:bg-amber-700 text-white"
+                            className="flex-1"
+                            style={{
+                              backgroundColor: 'rgb(217 119 6)',
+                              borderColor: 'rgb(217 119 6)',
+                              color: 'white'
+                            }}
                           >
                             Save Bookmark
                           </Button>
@@ -674,21 +699,22 @@ export default function BookDetailPage() {
 
         {/* Main Content - Page Content */}
         <div className="flex-1 p-4 md:p-4 pt-16 md:pt-4 flex flex-col">
-          <Card className="flex-1 bg-white/95 backdrop-blur-sm border border-amber-200/50 shadow-lg rounded-xl overflow-hidden">
+          <Card className="flex-1 bg-white/95 backdrop-blur-md border border-mirage-border-primary shadow-xl rounded-xl overflow-hidden">
             <div className="h-full flex flex-col">
               {/* Page Header */}
-              <div className="px-4 py-3 md:px-6 md:py-4 border-b border-amber-200/30 bg-white/50">
+              <div className="px-4 py-3 md:px-6 md:py-4 border-b border-mirage-border-primary bg-white/90">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <h2 className="text-sm md:text-lg font-semibold text-amber-900">
+                    <h2 className="text-sm md:text-lg font-semibold text-mirage-text-primary">
                       Page {currentPage} of {book?.pageCount}
                     </h2>
                     {existingBookmark && (
                       <span
-                        className="text-amber-600 hover:text-amber-800 transition-colors"
+                        style={{ color: 'rgb(217 119 6)' }}
+                        className="transition-colors cursor-pointer"
                         title={existingBookmark.note ? `Bookmarked: ${existingBookmark.note}` : 'Bookmarked'}
                       >
-                        <Bookmark className="h-4 w-4 fill-current" />
+                        <Bookmark className="h-4 w-4 fill-current" style={{ color: 'rgb(217 119 6)' }} />
                       </span>
                     )}
                   </div>
@@ -698,7 +724,7 @@ export default function BookDetailPage() {
                       disabled={currentPage <= 1}
                       variant="outline"
                       size="sm"
-                      className="h-8 px-2 md:h-10 md:px-4 text-xs md:text-sm bg-white/80 border-amber-200/50"
+                      className="h-8 px-2 md:h-10 md:px-4 text-xs md:text-sm bg-white/90 border-mirage-border-primary"
                     >
                       <ChevronLeft className="h-3 w-3 md:h-4 md:w-4 mr-1 md:mr-2" />
                       <span className="hidden sm:inline">Previous</span>
@@ -709,7 +735,7 @@ export default function BookDetailPage() {
                       disabled={!book || currentPage >= book.pageCount}
                       variant="outline"
                       size="sm"
-                      className="h-8 px-2 md:h-10 md:px-4 text-xs md:text-sm bg-white/80 border-amber-200/50"
+                      className="h-8 px-2 md:h-10 md:px-4 text-xs md:text-sm bg-white/90 border-mirage-border-primary"
                     >
                       <span className="hidden sm:inline">Next</span>
                       <span className="sm:hidden">Next</span>
@@ -725,14 +751,14 @@ export default function BookDetailPage() {
                   {pageLoading ? (
                     <div className="flex items-center justify-center h-64">
                       <div className="text-center">
-                        <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-amber-600 mx-auto"></div>
-                        <p className="mt-4 text-amber-800">Loading page content...</p>
+                        <div className="animate-spin rounded-full h-16 w-16 border-b-2 mx-auto" style={{ borderColor: 'rgb(217 119 6)' }}></div>
+                        <p className="mt-4 text-mirage-text-secondary">Loading page content...</p>
                       </div>
                     </div>
                   ) : isGenerating ? (
                     <div className="space-y-4">
-                      <div className="flex items-center gap-2 text-amber-700 mb-4">
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-amber-600"></div>
+                      <div className="flex items-center gap-2 text-mirage-text-tertiary mb-4">
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2" style={{ borderColor: 'rgb(217 119 6)' }}></div>
                         <span className="text-sm">Generating page content...</span>
                       </div>
 
@@ -740,15 +766,15 @@ export default function BookDetailPage() {
                       <div className="prose prose-amber max-w-none">
                         <Markdown
                           components={{
-                            h1: ({ children }) => <h1 className="text-2xl font-bold text-amber-900 mb-4">{children}</h1>,
-                            h2: ({ children }) => <h2 className="text-xl font-semibold text-amber-900 mb-3">{children}</h2>,
-                            h3: ({ children }) => <h3 className="text-lg font-medium text-amber-900 mb-2">{children}</h3>,
-                            p: ({ children }) => <p className="text-amber-900 leading-relaxed mb-4">{children}</p>,
-                            em: ({ children }) => <em className="text-amber-800 italic">{children}</em>,
-                            strong: ({ children }) => <strong className="text-amber-900 font-semibold">{children}</strong>,
-                            ul: ({ children }) => <ul className="list-disc list-inside mb-4 text-amber-900 space-y-1">{children}</ul>,
-                            ol: ({ children }) => <ol className="list-decimal list-inside mb-4 text-amber-900 space-y-1">{children}</ol>,
-                            blockquote: ({ children }) => <blockquote className="border-l-4 border-amber-300 pl-4 italic text-amber-800 mb-4">{children}</blockquote>,
+                            h1: ({ children }) => <h1 className="text-2xl font-bold text-mirage-text-primary mb-4">{children}</h1>,
+                            h2: ({ children }) => <h2 className="text-xl font-semibold text-mirage-text-primary mb-3">{children}</h2>,
+                            h3: ({ children }) => <h3 className="text-lg font-medium text-mirage-text-primary mb-2">{children}</h3>,
+                            p: ({ children }) => <p className="text-mirage-text-primary leading-relaxed mb-4">{children}</p>,
+                            em: ({ children }) => <em className="text-mirage-text-secondary italic">{children}</em>,
+                            strong: ({ children }) => <strong className="text-mirage-text-primary font-semibold">{children}</strong>,
+                            ul: ({ children }) => <ul className="list-disc list-inside mb-4 text-mirage-text-primary space-y-1">{children}</ul>,
+                            ol: ({ children }) => <ol className="list-decimal list-inside mb-4 text-mirage-text-primary space-y-1">{children}</ol>,
+                            blockquote: ({ children }) => <blockquote className="border-l-4 border-mirage-border-primary pl-4 italic text-mirage-text-secondary mb-4">{children}</blockquote>,
                           }}
                         >
                           {messages[messages.length - 1]?.content || ''}
@@ -759,15 +785,15 @@ export default function BookDetailPage() {
                     <div className="prose prose-amber max-w-none">
                       <Markdown
                         components={{
-                          h1: ({ children }) => <h1 className="text-2xl font-bold text-amber-900 mb-4">{children}</h1>,
-                          h2: ({ children }) => <h2 className="text-xl font-semibold text-amber-900 mb-3">{children}</h2>,
-                          h3: ({ children }) => <h3 className="text-lg font-medium text-amber-900 mb-2">{children}</h3>,
-                          p: ({ children }) => <p className="text-amber-900 leading-relaxed mb-4">{children}</p>,
-                          em: ({ children }) => <em className="text-amber-800 italic">{children}</em>,
-                          strong: ({ children }) => <strong className="text-amber-900 font-semibold">{children}</strong>,
-                          ul: ({ children }) => <ul className="list-disc list-inside mb-4 text-amber-900 space-y-1">{children}</ul>,
-                          ol: ({ children }) => <ol className="list-decimal list-inside mb-4 text-amber-900 space-y-1">{children}</ol>,
-                          blockquote: ({ children }) => <blockquote className="border-l-4 border-amber-300 pl-4 italic text-amber-800 mb-4">{children}</blockquote>,
+                          h1: ({ children }) => <h1 className="text-2xl font-bold text-mirage-text-primary mb-4">{children}</h1>,
+                          h2: ({ children }) => <h2 className="text-xl font-semibold text-mirage-text-primary mb-3">{children}</h2>,
+                          h3: ({ children }) => <h3 className="text-lg font-medium text-mirage-text-primary mb-2">{children}</h3>,
+                          p: ({ children }) => <p className="text-mirage-text-primary leading-relaxed mb-4">{children}</p>,
+                          em: ({ children }) => <em className="text-mirage-text-secondary italic">{children}</em>,
+                          strong: ({ children }) => <strong className="text-mirage-text-primary font-semibold">{children}</strong>,
+                          ul: ({ children }) => <ul className="list-disc list-inside mb-4 text-mirage-text-primary space-y-1">{children}</ul>,
+                          ol: ({ children }) => <ol className="list-decimal list-inside mb-4 text-mirage-text-primary space-y-1">{children}</ol>,
+                          blockquote: ({ children }) => <blockquote className="border-l-4 border-mirage-border-primary pl-4 italic text-mirage-text-secondary mb-4">{children}</blockquote>,
                         }}
                       >
                         {pageContent}
@@ -778,17 +804,22 @@ export default function BookDetailPage() {
                       <div className="text-center space-y-4">
                         {!user ? (
                           <>
-                            <p className="text-amber-600">This page hasn't been generated yet.</p>
-                            <p className="text-amber-500 text-sm">Please sign in to generate new pages.</p>
+                            <p className="text-mirage-text-muted">This page hasn't been generated yet.</p>
+                            <p className="text-mirage-text-light text-sm">Please sign in to generate new pages.</p>
                             <Button
                               onClick={() => window.location.href = '/'}
-                              className="bg-amber-600 hover:bg-amber-700 text-white"
+                              className=""
+                              style={{
+                                backgroundColor: 'rgb(217 119 6)',
+                                borderColor: 'rgb(217 119 6)',
+                                color: 'white'
+                              }}
                             >
                               Sign In
                             </Button>
                           </>
                         ) : (
-                          <p className="text-amber-600">No content available for this page.</p>
+                          <p className="text-mirage-text-muted">No content available for this page.</p>
                         )}
                       </div>
                     </div>
@@ -804,9 +835,9 @@ export default function BookDetailPage() {
 
       {/* Bookmarks List Modal */}
       <Dialog open={isBookmarksListOpen} onOpenChange={setIsBookmarksListOpen}>
-        <DialogContent className="max-w-md max-h-[80vh] bg-white/95 backdrop-blur-sm border border-amber-200/50">
+        <DialogContent className="max-w-md max-h-[80vh] bg-white/95 backdrop-blur-md border border-mirage-border-primary shadow-xl">
           <DialogHeader>
-            <DialogTitle className="text-lg font-bold text-amber-900 flex items-center gap-2">
+            <DialogTitle className="text-lg font-bold text-mirage-text-primary flex items-center gap-2">
               <List className="h-5 w-5" />
               Bookmarks for "{book?.title}"
             </DialogTitle>
@@ -814,13 +845,13 @@ export default function BookDetailPage() {
           <div className="mt-4 space-y-2 max-h-96 overflow-y-auto">
             {bookmarksLoading ? (
               <div className="flex items-center justify-center py-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-amber-600"></div>
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2" style={{ borderColor: 'rgb(217 119 6)' }}></div>
               </div>
             ) : allBookmarks.length === 0 ? (
-              <div className="text-center py-8 text-amber-600">
+              <div className="text-center py-8 text-mirage-text-muted">
                 <Bookmark className="h-12 w-12 mx-auto mb-3 opacity-50" />
                 <p className="text-sm">No bookmarks yet.</p>
-                <p className="text-xs text-amber-500 mt-1">Bookmark pages as you read to quickly return to them.</p>
+                <p className="text-xs text-mirage-text-light mt-1">Bookmark pages as you read to quickly return to them.</p>
               </div>
             ) : (
               <div className="space-y-2">
@@ -830,8 +861,8 @@ export default function BookDetailPage() {
                     className={`
                       p-3 rounded-lg border cursor-pointer transition-all duration-200 hover:shadow-md
                       ${bookmark.page_number === currentPage
-                        ? 'bg-amber-100 border-amber-300 shadow-sm'
-                        : 'bg-white/80 border-amber-200/50 hover:bg-amber-50'
+                        ? 'bg-mirage-bg-tertiary border-mirage-border-primary shadow-sm'
+                        : 'bg-white/90 border-mirage-border-primary hover:bg-white'
                       }
                     `}
                     onClick={() => jumpToBookmark(bookmark.page_number)}
@@ -839,36 +870,39 @@ export default function BookDetailPage() {
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1">
-                          <span className="font-medium text-amber-900">
+                          <span className="font-medium text-mirage-text-primary">
                             Page {bookmark.page_number}
                           </span>
                           {bookmark.page_number === currentPage && (
-                            <span className="text-xs bg-amber-600 text-white px-1.5 py-0.5 rounded">
+                            <span 
+                              className="text-xs text-white px-1.5 py-0.5 rounded"
+                              style={{ backgroundColor: 'rgb(217 119 6)' }}
+                            >
                               Current
                             </span>
                           )}
                         </div>
                         {bookmark.note && (
-                          <p className="text-sm text-amber-700 line-clamp-2">
+                          <p className="text-sm text-mirage-text-tertiary line-clamp-2">
                             {bookmark.note}
                           </p>
                         )}
-                        <p className="text-xs text-amber-500 mt-1">
+                        <p className="text-xs text-mirage-text-light mt-1">
                           {bookmark.created_at ? new Date(bookmark.created_at).toLocaleDateString() : 'Unknown date'}
                         </p>
                       </div>
-                      <ChevronRight className="h-4 w-4 text-amber-400 flex-shrink-0 ml-2" />
+                      <ChevronRight className="h-4 w-4 text-mirage-text-light flex-shrink-0 ml-2" />
                     </div>
                   </div>
                 ))}
               </div>
             )}
           </div>
-          <div className="flex justify-end pt-4 border-t border-amber-200/30">
+          <div className="flex justify-end pt-4 border-t border-mirage-border-primary">
             <Button
               onClick={() => setIsBookmarksListOpen(false)}
               variant="outline"
-              className="border-amber-200/50"
+              className="border-mirage-border-primary"
             >
               Close
             </Button>

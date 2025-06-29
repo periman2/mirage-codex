@@ -14,6 +14,34 @@ export default {
         mono: ["var(--font-jetbrains-mono)", "monospace"],
       },
       colors: {
+        // Mirage Codex Theme
+        mirage: {
+          // Background colors
+          bg: {
+            primary: "rgb(255 251 235)", // amber-50 - main background
+            secondary: "rgb(255 255 255)", // white - cards and overlays
+            tertiary: "rgb(254 243 199)", // amber-100 - subtle highlights
+          },
+          // Text colors
+          text: {
+            primary: "rgb(120 53 15)", // amber-900 - main headings
+            secondary: "rgb(146 64 14)", // amber-800 - secondary text
+            tertiary: "rgb(180 83 9)", // amber-700 - body text
+            muted: "rgb(217 119 6)", // amber-600 - muted text
+            light: "rgb(245 158 11)", // amber-500 - light text
+          },
+          // Border colors
+          border: {
+            primary: "rgb(254 215 170)", // amber-200 - main borders
+            secondary: "rgb(253 230 138)", // amber-200/50 - subtle borders
+          },
+          // Accent colors (for buttons, highlights)
+          accent: {
+            primary: "rgb(217 119 6)", // amber-600 - main accent
+            hover: "rgb(180 83 9)", // amber-700 - hover state
+            light: "rgb(245 158 11)", // amber-500 - light accent
+          }
+        },
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
         card: {
@@ -59,6 +87,9 @@ export default {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
+      },
+      backgroundImage: {
+        'mirage-gradient': 'linear-gradient(to bottom right, rgb(255 251 235), rgb(255 255 255), rgb(255 251 235))',
       },
     },
   },
