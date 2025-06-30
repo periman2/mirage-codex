@@ -44,8 +44,8 @@ interface SearchResult {
 
 interface SearchRequest {
   freeText?: string
-  languageCode: string
-  genreSlug: string
+  languageCode?: string
+  genreSlug?: string
   tagSlugs: string[]
   modelId: number
   pageNumber: number
@@ -54,7 +54,7 @@ interface SearchRequest {
 // Type for tracking the current paginated search parameters
 interface PaginatedSearchState {
   freeText: string
-  genreSlug: string
+  genreSlug: string // Keep as string, use empty string for no genre
   tagSlugs: string[]
   modelId: number
 }
@@ -68,8 +68,8 @@ function SearchPageContent() {
   const { data: models } = useModels()
 
   const [searchQuery, setSearchQuery] = useState('')
-  const [selectedLanguage, setSelectedLanguage] = useState('en')
-  const [selectedGenre, setSelectedGenre] = useState('')
+  const [selectedLanguage, setSelectedLanguage] = useState('auto')
+  const [selectedGenre, setSelectedGenre] = useState('auto')
   const [selectedTags, setSelectedTags] = useState<string[]>([])
   const [selectedModel, setSelectedModel] = useState<number | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
@@ -91,32 +91,31 @@ function SearchPageContent() {
     }
   }, [defaultModel, selectedModel])
 
-  // Set default genre to first available genre
-  useMemo(() => {
-    if (genres && genres.length > 0 && !selectedGenre) {
-      setSelectedGenre(genres[0].slug)
-    }
-  }, [genres, selectedGenre])
+  // Remove default genre selection - user must choose or we'll use AI to determine
 
   // Parse URL parameters on component mount and when search params change
   useEffect(() => {
-    if (!genres || !models || !isInitialLoad || !defaultModel) return
+    if (!genres || !models || !languages || !searchParams || !isInitialLoad || !defaultModel) return
 
     const urlQuery = searchParams.get('q') || ''
     const urlGenre = searchParams.get('genre') || ''
+    const urlLanguage = searchParams.get('language') || ''
     const urlTags = searchParams.get('tags') ? searchParams.get('tags')!.split(',').filter(Boolean) : []
     const urlPage = parseInt(searchParams.get('page') || '1')
 
-    // Validate genre exists
-    const validGenre = genres.find(g => g.slug === urlGenre)
+    // Validate genre exists (but don't require it)
+    const validGenre = urlGenre ? genres.find(g => g.slug === urlGenre) : null
+    // Validate language exists (but don't require it)
+    const validLanguage = urlLanguage ? languages.find(l => l.code === urlLanguage) : null
 
     // Find the default model directly from models array
     const modelToUse = defaultModel
 
-    if (urlQuery || urlGenre || urlTags.length > 0 || urlPage > 1) {
+    if (urlQuery || urlGenre || urlLanguage || urlTags.length > 0 || urlPage > 1) {
       // Set state from URL
       setSearchQuery(urlQuery)
-      setSelectedGenre(validGenre ? urlGenre : (genres[0]?.slug || ''))
+      setSelectedGenre(validGenre ? urlGenre : 'auto') // Use "auto" when no valid genre from URL
+      setSelectedLanguage(validLanguage ? urlLanguage : 'auto') // Use "auto" when no valid language from URL
       setSelectedTags(urlTags)
       setCurrentPage(urlPage)
 
@@ -126,11 +125,12 @@ function SearchPageContent() {
       }
 
       // If we have valid search parameters and a model, trigger the search
-      if (validGenre && modelToUse) {
+      // Now we can search with just query text even without genre or language
+      if ((validGenre || urlQuery.trim()) && modelToUse) {
         searchMutation.mutate({
           freeText: urlQuery || undefined,
-          languageCode: selectedLanguage,
-          genreSlug: urlGenre,
+          languageCode: urlLanguage || undefined, // Don't send language if not in URL
+          genreSlug: urlGenre || undefined, // Allow undefined genre
           tagSlugs: urlTags,
           modelId: modelToUse,
           pageNumber: urlPage,
@@ -139,12 +139,13 @@ function SearchPageContent() {
     }
 
     setIsInitialLoad(false)
-  }, [genres, models, searchParams, selectedLanguage, isInitialLoad, defaultModel])
+  }, [genres, models, languages, searchParams, isInitialLoad, defaultModel])
 
   // Function to update URL with search parameters
   const updateURL = (params: {
     query?: string
     genre: string
+    language?: string
     tags: string[]
     page: number
   }) => {
@@ -153,7 +154,12 @@ function SearchPageContent() {
     if (params.query && params.query.trim()) {
       urlParams.set('q', params.query.trim())
     }
-    urlParams.set('genre', params.genre)
+    if (params.genre) {
+      urlParams.set('genre', params.genre)
+    }
+    if (params.language) {
+      urlParams.set('language', params.language)
+    }
     if (params.tags.length > 0) {
       urlParams.set('tags', params.tags.join(','))
     }
@@ -223,6 +229,7 @@ function SearchPageContent() {
       updateURL({
         query: paginatedSearchState.freeText,
         genre: paginatedSearchState.genreSlug,
+        language: selectedLanguage === 'auto' ? '' : selectedLanguage, // Include current language selection, convert auto to empty
         tags: paginatedSearchState.tagSlugs,
         page: newPage
       })
@@ -230,8 +237,8 @@ function SearchPageContent() {
       // Trigger new search with the new page
       searchMutation.mutate({
         freeText: paginatedSearchState.freeText || undefined,
-        languageCode: selectedLanguage,
-        genreSlug: paginatedSearchState.genreSlug,
+        languageCode: selectedLanguage === 'auto' ? undefined : selectedLanguage || undefined, // Convert "auto" to undefined
+        genreSlug: paginatedSearchState.genreSlug || undefined,
         tagSlugs: paginatedSearchState.tagSlugs,
         modelId: paginatedSearchState.modelId,
         pageNumber: newPage,
@@ -269,7 +276,7 @@ function SearchPageContent() {
       // Update paginated search state when search succeeds
       setPaginatedSearchState({
         freeText: variables.freeText || '',
-        genreSlug: variables.genreSlug,
+        genreSlug: variables.genreSlug || 'auto', // Use "auto" for consistency with UI state
         tagSlugs: [...variables.tagSlugs],
         modelId: variables.modelId
       })
@@ -286,8 +293,10 @@ function SearchPageContent() {
   })
 
   const handleSearch = () => {
-    if (!selectedGenre) {
-      toast.error('Please select a genre')
+    // Updated validation logic: require text query if both language and genre are auto-detect
+    // Otherwise allow any combination
+    if (!searchQuery.trim() && selectedGenre === 'auto' && selectedLanguage === 'auto') {
+      toast.error('Please enter a search query, or select a language/genre')
       return
     }
 
@@ -302,15 +311,16 @@ function SearchPageContent() {
     // Update URL with search parameters
     updateURL({
       query: searchQuery,
-      genre: selectedGenre,
+      genre: selectedGenre === 'auto' ? '' : selectedGenre,
+      language: selectedLanguage === 'auto' ? '' : selectedLanguage,
       tags: selectedTags,
       page: 1
     })
 
     searchMutation.mutate({
       freeText: searchQuery.trim() || undefined,
-      languageCode: selectedLanguage,
-      genreSlug: selectedGenre,
+      languageCode: selectedLanguage === 'auto' ? undefined : selectedLanguage || undefined, // Convert "auto" to undefined
+      genreSlug: selectedGenre === 'auto' ? undefined : selectedGenre || undefined, // Convert "auto" to undefined
       tagSlugs: selectedTags,
       modelId: selectedModel,
       pageNumber: 1, // Always start from page 1 for new searches
@@ -318,7 +328,7 @@ function SearchPageContent() {
   }
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !searchMutation.isPending && selectedGenre && selectedModel) {
+    if (e.key === 'Enter' && !searchMutation.isPending && selectedModel && (searchQuery.trim() || selectedGenre !== 'auto' || selectedLanguage !== 'auto')) {
       handleSearch()
     }
   }
@@ -450,9 +460,12 @@ function SearchPageContent() {
                 <Label className="text-sm font-medium text-mirage-text-secondary">Language</Label>
                 <Select value={selectedLanguage} onValueChange={setSelectedLanguage}>
                   <SelectTrigger className="h-9 text-sm bg-white/90 border-mirage-border-primary !w-full min-w-0">
-                    <SelectValue />
+                    <SelectValue placeholder="Auto-detect from AI" />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="auto" className="text-sm font-medium text-mirage-accent-primary">
+                      Auto-detect from AI
+                    </SelectItem>
                     {languages?.map((lang) => (
                       <SelectItem key={lang.code} value={lang.code} className="text-sm">
                         {lang.label}
@@ -464,12 +477,15 @@ function SearchPageContent() {
 
               {/* Genre Selection */}
               <div className="space-y-2">
-                <Label className="text-sm font-medium text-mirage-text-secondary">Genre *</Label>
+                <Label className="text-sm font-medium text-mirage-text-secondary">Genre</Label>
                 <Select value={selectedGenre} onValueChange={handleGenreChange}>
                   <SelectTrigger className="h-9 text-sm bg-white/90 border-mirage-border-primary !w-full min-w-0">
-                    <SelectValue placeholder="Select a genre" />
+                    <SelectValue placeholder="Auto-detect from AI" />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="auto" className="text-sm font-medium text-mirage-accent-primary">
+                      Auto-detect from AI
+                    </SelectItem>
                     {genres?.map((genre) => (
                       <SelectItem key={genre.slug} value={genre.slug} className="text-sm">
                         {genre.label}
@@ -535,7 +551,7 @@ function SearchPageContent() {
                 handleSearch()
                 setIsMobileFiltersOpen(false) // Close mobile filters after search
               }}
-              disabled={searchMutation.isPending || !selectedGenre || !selectedModel}
+              disabled={searchMutation.isPending || (!searchQuery.trim() && selectedGenre === 'auto' && selectedLanguage === 'auto') || !selectedModel}
               className="w-full h-10 text-sm font-medium mt-6 shadow-lg border-2"
               style={{
                 backgroundColor: 'rgb(217 119 6)',
@@ -569,9 +585,6 @@ function SearchPageContent() {
               <h1 className="text-2xl md:text-3xl font-bold text-mirage-text-primary mb-2">
                 Dive into infinity
               </h1>
-              <p className="text-sm text-mirage-text-tertiary leading-relaxed">
-                Describe your ideal book and let it be found within the codex.
-              </p>
             </div>
 
             {/* Main Search Input */}
@@ -586,7 +599,7 @@ function SearchPageContent() {
               />
               <Button
                 onClick={handleSearch}
-                disabled={searchMutation.isPending || !selectedGenre || !selectedModel}
+                disabled={searchMutation.isPending || (!searchQuery.trim() && selectedGenre === 'auto' && selectedLanguage === 'auto') || !selectedModel}
                 className="absolute right-1 top-1 h-10 w-10 p-0 shadow-lg border-2 rounded-lg z-10"
                 style={{
                   backgroundColor: 'rgb(217 119 6)',

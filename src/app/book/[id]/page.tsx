@@ -52,8 +52,6 @@ export default function BookDetailPage() {
     if (!currentEdition?.id || !bookId || !currentPage) return content
 
     const promptPattern = /\[p=([^\]]+)\]/g
-    
-    console.log('🔄 Processing image prompts in content...', content);
 
     // Replace [p=prompt] with markdown image pointing to our API route
     const processedContent = content.replace(promptPattern, (match, prompt) => {
@@ -65,8 +63,7 @@ export default function BookDetailPage() {
       // Simple markdown image syntax - let the browser handle loading
       return `\n\n![Scene: ${trimmedPrompt}](${imageUrl})\n*${trimmedPrompt}*\n\n`
     })
-
-    console.log('✅ Image prompt replacement complete');
+    
     return processedContent
   }
 

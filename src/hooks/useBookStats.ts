@@ -246,7 +246,6 @@ export function usePageContent(
     queryKey: ['page-content', bookId, pageNumber, editionId],
     queryFn: async () => {
       try {
-        console.log('🔄 usePageContent queryFn running', { bookId, pageNumber, editionId });
         
         if (!editionId) {
           throw new Error('Edition ID required for page content')

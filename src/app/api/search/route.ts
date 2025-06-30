@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient, createSupabaseAdminClient } from '@/lib/supabase'
 import { createSearchHash, validateSearchParams } from '@/lib/hash'
-import { generateBooks, generateAuthors, PAGE_SIZE, AuthorSchema } from '@/lib/ai'
+import { generateBooks, generateAuthors, determineGenreAndLanguage, PAGE_SIZE, AuthorSchema } from '@/lib/ai'
 import { z } from 'zod'
 import { SupabaseClient } from '@supabase/supabase-js'
 import { Database, Tables } from '@/lib/database.types'
@@ -10,8 +10,8 @@ import { Database, Tables } from '@/lib/database.types'
 
 const SearchRequestSchema = z.object({
   freeText: z.string().optional(),
-  languageCode: z.string(),
-  genreSlug: z.string(),
+  languageCode: z.string().optional(),
+  genreSlug: z.string().optional(),
   tagSlugs: z.array(z.string()).default([]),
   modelId: z.number(),
   pageNumber: z.number().min(1).default(1),
@@ -163,35 +163,26 @@ export async function POST(request: NextRequest) {
     const validatedInput = SearchRequestSchema.parse(body)
     console.log('✅ Input validated:', validatedInput)
     
-    // Validate search parameters
-    const searchParams = validateSearchParams({
-      freeText: validatedInput.freeText || null,
-      languageCode: validatedInput.languageCode,
-      genreSlug: validatedInput.genreSlug,
-      tagSlugs: validatedInput.tagSlugs,
+    // Create hash FIRST with user's original input (before AI determination)
+    // This allows us to check cache before spending AI credits
+    const originalSearchParams = {
+      freeText: validatedInput.freeText?.trim() || null,
+      languageCode: validatedInput.languageCode || null,
+      genreSlug: validatedInput.genreSlug || null,
+      tagSlugs: validatedInput.tagSlugs || [],
       modelId: validatedInput.modelId,
       pageNumber: validatedInput.pageNumber,
-      pageSize: PAGE_SIZE, // Server-controlled page size
-    })
-
-    if (!searchParams) {
-      console.log('❌ Invalid search parameters')
-      return NextResponse.json(
-        { error: 'Invalid search parameters' },
-        { status: 400 }
-      )
+      pageSize: PAGE_SIZE,
+      extraJson: null
     }
-
-    console.log('✅ Search params validated:', searchParams)
-
-    // Create deterministic hash (includes pagination)
-    const searchHash = createSearchHash(searchParams)
-    console.log('🔑 Generated hash:', searchHash)
+    
+    const searchHash = createSearchHash(originalSearchParams)
+    console.log('🔑 Generated hash from original input:', searchHash)
     
     const supabase = await createSupabaseServerClient()
     console.log('✅ Supabase client created')
     
-    // Check if search results already exist for this hash
+    // Check if search results already exist for this hash BEFORE AI determination
     console.log('🔍 Checking for existing results...')
     const { data: existingResults } = await supabase
       .rpc('get_search_results', { p_hash: searchHash })
@@ -199,7 +190,7 @@ export async function POST(request: NextRequest) {
     console.log('📊 Existing results query result:', existingResults)
 
     if (existingResults && existingResults.length > 0) {
-      console.log('💾 Found cached results, returning them')
+      console.log('💾 Found cached results, returning them - no AI credits used!')
       // Return cached results
       const books = existingResults.map((result: any) => ({
         id: result.book_id,
@@ -230,7 +221,91 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    console.log('🆕 No cached results found, generating new books')
+    console.log('🆕 No cached results found, proceeding with AI determination...')
+    
+    // Determine genre and language if not provided (only for new searches)
+    let finalGenreSlug = validatedInput.genreSlug
+    let finalLanguageCode = validatedInput.languageCode
+
+    console.log('🎯 Final determined values BEFORE AI:', { finalGenreSlug, finalLanguageCode })
+    
+    if ((!finalGenreSlug || !finalLanguageCode) && validatedInput.freeText) {
+      console.log('🤖 Missing genre or language, using AI to determine both...')
+      
+      // Get available genres and languages for AI context
+      const { data: availableGenres } = await supabase
+        .from('genres')
+        .select('slug, label')
+        .eq('is_active', true)
+        .order('label')
+      
+      const { data: availableLanguages } = await supabase
+        .from('languages')
+        .select('code, label')
+        .order('label')
+      
+      if (!availableGenres || !availableLanguages) {
+        console.error('❌ Failed to fetch genres or languages for AI determination')
+        return NextResponse.json(
+          { error: 'Failed to fetch available options for search' },
+          { status: 500 }
+        )
+      }
+      
+      // Use AI to determine genre and language
+      const { data: model } = await supabase
+        .from('models')
+        .select('name, domain_code')
+        .eq('id', validatedInput.modelId)
+        .single()
+      
+      if (!model) {
+        console.error('❌ Model not found for AI determination')
+        return NextResponse.json(
+          { error: 'Invalid model' },
+          { status: 400 }
+        )
+      }
+      
+      const determination = await determineGenreAndLanguage({
+        freeText: validatedInput.freeText,
+        availableGenres,
+        availableLanguages,
+        modelName: model.name,
+        modelDomain: model.domain_code,
+      })
+      
+      console.log('🎯 AI determined genre and language:', determination)
+      
+      // Use AI determined values or keep existing ones
+      if(!finalGenreSlug){
+        finalGenreSlug =  determination.genreSlug 
+      }
+      if(!finalLanguageCode){
+        finalLanguageCode = determination.languageCode
+      }
+      console.log('🎯 Final determined values:', { finalGenreSlug, finalLanguageCode })
+    }
+    
+    // Provide fallbacks if still not set
+    finalLanguageCode = finalLanguageCode || 'en'
+    finalGenreSlug = finalGenreSlug || 'fiction'
+    
+    console.log('🎯 Final determined values:', { finalGenreSlug, finalLanguageCode })
+    
+    // Create final search params for processing (but keep original hash)
+    const finalSearchParams = {
+      freeText: validatedInput.freeText?.trim() || null,
+      languageCode: finalLanguageCode,
+      genreSlug: finalGenreSlug,
+      tagSlugs: validatedInput.tagSlugs,
+      modelId: validatedInput.modelId,
+      pageNumber: validatedInput.pageNumber,
+      pageSize: PAGE_SIZE,
+      extraJson: null
+    }
+
+    console.log('✅ Final search params for processing:', finalSearchParams)
 
     // Get user (if authenticated)
     console.log('👤 Getting user authentication...')
@@ -246,12 +321,12 @@ export async function POST(request: NextRequest) {
 
     console.log('✅ User authenticated:', user.id)
 
-    // Look up required data for AI generation
+    // Look up required data for AI generation using final determined values
     console.log('📚 Looking up genre and model data...')
     const { data: genre } = await supabase
       .from('genres')
       .select('prompt_boost')
-      .eq('slug', searchParams.genreSlug)
+      .eq('slug', finalGenreSlug)
       .single()
 
     console.log('📖 Genre data:', genre)
@@ -259,7 +334,7 @@ export async function POST(request: NextRequest) {
     const { data: model } = await supabase
       .from('models')
       .select('name, domain_code')
-      .eq('id', searchParams.modelId)
+      .eq('id', finalSearchParams.modelId)
       .single()
 
     console.log('🤖 Model data:', model)
@@ -277,7 +352,7 @@ export async function POST(request: NextRequest) {
     const { data: tags } = await supabase
       .from('tags')
       .select('prompt_boost')
-      .in('slug', searchParams.tagSlugs)
+      .in('slug', finalSearchParams.tagSlugs)
 
     console.log('🏷️ Tags data:', tags)
     const tagPrompts = tags?.map(t => t.prompt_boost).filter((prompt): prompt is string => Boolean(prompt)) || []
@@ -328,7 +403,7 @@ export async function POST(request: NextRequest) {
     
     if (shouldTryExistingAuthors) {
       console.log('🔍 Attempting to use existing authors...')
-      finalAuthors = await selectExistingAuthorsByGenre(supabase, searchParams.genreSlug, PAGE_SIZE)
+      finalAuthors = await selectExistingAuthorsByGenre(supabase, finalGenreSlug, PAGE_SIZE)
     }
     
     // If we don't have enough authors, generate new ones
@@ -339,8 +414,8 @@ export async function POST(request: NextRequest) {
       // Generate new authors with retry logic
       console.log('🤖 Generating new authors...')
       const generatedAuthors = await generateAuthors({
-        genrePrompt: genre.prompt_boost || `Generate authors for ${searchParams.genreSlug} genre`,
-        languageCode: searchParams.languageCode,
+        genrePrompt: genre.prompt_boost || `Generate authors for ${finalGenreSlug} genre`,
+        languageCode: finalLanguageCode,
         modelName: model.name,
         modelDomain: model.domain_code,
         count: authorsNeeded,
@@ -349,7 +424,7 @@ export async function POST(request: NextRequest) {
       console.log('✅ Authors generated successfully')
 
       // Save generated authors to database (this adds the random suffixes)
-      const savedAuthors = await saveGeneratedAuthors(generatedAuthors, searchParams.genreSlug)
+      const savedAuthors = await saveGeneratedAuthors(generatedAuthors, finalGenreSlug)
       
       // Combine existing and new authors
       finalAuthors = [...finalAuthors, ...savedAuthors]
@@ -361,24 +436,24 @@ export async function POST(request: NextRequest) {
     // Generate new books using AI with the selected/generated authors
     console.log('🤖 Generating books with model:', model.name, 'for domain:', model.domain_code)
     console.log('🤖 Generation params:', {
-      freeText: searchParams.freeText,
+      freeText: finalSearchParams.freeText,
       genrePrompt: genre.prompt_boost?.substring(0, 100) + '...',
       tagPrompts: tagPrompts.length,
-      languageCode: searchParams.languageCode,
-      pageNumber: searchParams.pageNumber,
-      pageSize: searchParams.pageSize,
+      languageCode: finalLanguageCode,
+      pageNumber: finalSearchParams.pageNumber,
+      pageSize: finalSearchParams.pageSize,
       authorCount: finalAuthors.length
     })
     
     const generatedBooks = await generateBooks({
-      freeText: searchParams.freeText,
-      genrePrompt: genre.prompt_boost || `Generate ${searchParams.genreSlug} books`,
+      freeText: finalSearchParams.freeText,
+      genrePrompt: genre.prompt_boost || `Generate ${finalGenreSlug} books`,
       tagPrompts,
-      languageCode: searchParams.languageCode,
+      languageCode: finalLanguageCode,
       modelName: model.name,
       modelDomain: model.domain_code,
-      pageNumber: searchParams.pageNumber,
-      pageSize: searchParams.pageSize,
+      pageNumber: finalSearchParams.pageNumber,
+      pageSize: finalSearchParams.pageSize,
       // Remove authorPenNames - we'll assign authors randomly after generation
     })
 
@@ -406,32 +481,32 @@ export async function POST(request: NextRequest) {
       }
     })
 
-    // Save results using Supabase function (atomic transaction)
+    // Save results using Supabase function (atomic transaction) with original hash
     console.log('💾 Saving search results to database...')
     console.log('💾 Save params:', {
-      hash: searchHash,
+      hash: searchHash, // Use original hash from user input
       userId: user.id,
-      freeText: searchParams.freeText || '',
-      languageCode: searchParams.languageCode,
-      genreSlug: searchParams.genreSlug,
-      tagSlugs: searchParams.tagSlugs,
-      modelId: searchParams.modelId,
-      pageNumber: searchParams.pageNumber,
-      pageSize: searchParams.pageSize,
+      freeText: finalSearchParams.freeText || '',
+      languageCode: finalLanguageCode,
+      genreSlug: finalGenreSlug,
+      tagSlugs: finalSearchParams.tagSlugs,
+      modelId: finalSearchParams.modelId,
+      pageNumber: finalSearchParams.pageNumber,
+      pageSize: finalSearchParams.pageSize,
       booksCount: booksWithAuthorIds.length
     })
     
     const { data: saveResult } = await supabase
       .rpc('save_search_results', {
-        p_hash: searchHash,
+        p_hash: searchHash, // Use original hash
         p_user_id: user.id,
-        p_free_text: searchParams.freeText || '',
-        p_language_code: searchParams.languageCode,
-        p_genre_slug: searchParams.genreSlug,
-        p_tag_slugs: searchParams.tagSlugs,
-        p_model_id: searchParams.modelId,
-        p_page_number: searchParams.pageNumber,
-        p_page_size: searchParams.pageSize,
+        p_free_text: finalSearchParams.freeText || '',
+        p_language_code: finalLanguageCode,
+        p_genre_slug: finalGenreSlug,
+        p_tag_slugs: finalSearchParams.tagSlugs,
+        p_model_id: finalSearchParams.modelId,
+        p_page_number: finalSearchParams.pageNumber,
+        p_page_size: finalSearchParams.pageSize,
         p_books: booksWithAuthorIds,
       })
 

@@ -41,6 +41,13 @@ export const AuthorListSchema = z.object({
   authors: z.array(AuthorSchema).describe('A list of fictional authors for the specified genre'),
 })
 
+// Schema for genre and language determination
+export const GenreLanguageDeterminationSchema = z.object({
+  genreSlug: z.string().describe('The most appropriate genre slug for the user query'),
+  languageCode: z.string().describe('The detected language code for the user query'),
+  reasoning: z.string().describe('Brief explanation of why this genre and language were chosen'),
+})
+
 export const SectionSchema = z.object({
   title: z.string().describe('The section title (e.g., "Chapter 1", "Recipe 1: Roasted Tofu", "Introduction", "References")'),
   fromPage: z.number().min(1).describe('Starting page number for this section'),
@@ -129,6 +136,98 @@ CREATIVITY: Be highly creative and unexpected in your author creations. Think of
   }
   
   throw lastError || new Error('Author generation failed after all retries')
+}
+
+/**
+ * Determine the most appropriate genre and language from a user's free text query
+ */
+export async function determineGenreAndLanguage(params: {
+  freeText: string
+  availableGenres: Array<{ slug: string; label: string }>
+  availableLanguages: Array<{ code: string; label: string }>
+  modelName: string
+  modelDomain: string
+}): Promise<{ genreSlug: string; languageCode: string; reasoning: string }> {
+  console.log('🔍 Determining genre and language from query:', params.freeText.substring(0, 100) + '...')
+  
+  const model = createModel(params.modelDomain, params.modelName)
+  
+  // Create context about available options
+  const genreContext = params.availableGenres.map(g => `${g.slug}: ${g.label}`).join('\n')
+  const languageContext = params.availableLanguages.map(l => `${l.code}: ${l.label}`).join('\n')
+  
+  const systemPrompt = `You are a literary genre classifier and language detector. Your task is to analyze a user's book search query and determine:
+1. The most appropriate SINGLE genre from the available options
+2. The language the user is searching in
+
+## AVAILABLE GENRES:
+${genreContext}
+
+## AVAILABLE LANGUAGES:
+${languageContext}
+
+## ANALYSIS GUIDELINES:
+
+**Genre Selection:**
+- Look for explicit genre mentions (e.g., "mystery novel", "sci-fi story", "romance book")
+- Analyze thematic elements and keywords that suggest specific genres
+- Consider setting, plot elements, and character types mentioned
+- If multiple genres could apply, choose the most specific and prominent one
+- Default to "fiction" if no clear genre is identifiable but content suggests fictional stories
+- Default to "non-fiction" for instructional, educational, or factual content requests
+
+**Language Detection:**
+- Detect the primary language of the user's query
+- If query is in English but asks for books in another language, prioritize the requested language
+- Default to "en" (English) if language is ambiguous
+
+**Reasoning:**
+- Provide clear, concise reasoning for your choices
+- Mention specific keywords or phrases that influenced your decision
+- Explain why you chose one genre over potentially competing options
+
+Be decisive and confident in your analysis. Choose exactly one genre and one language.`
+
+  try {
+    const result = await generateObject({
+      model,
+      system: systemPrompt,
+      prompt: `Analyze this book search query and determine the most appropriate genre and language:
+
+"${params.freeText}"
+
+Return the exact slug/code from the available options, not custom values.`,
+      schema: GenreLanguageDeterminationSchema,
+      temperature: 0.1, // Low temperature for consistent classification
+    })
+
+    console.log('✅ Genre and language determined:', result.object)
+    
+    // Validate that the returned values exist in our available options
+    const genreExists = params.availableGenres.find(g => g.slug === result.object.genreSlug)
+    const languageExists = params.availableLanguages.find(l => l.code === result.object.languageCode)
+    
+    if (!genreExists) {
+      console.warn('⚠️ AI returned invalid genre slug, falling back to fiction')
+      result.object.genreSlug = 'fiction'
+    }
+    
+    if (!languageExists) {
+      console.warn('⚠️ AI returned invalid language code, falling back to en')
+      result.object.languageCode = 'en'
+    }
+    
+    return result.object
+    
+  } catch (error) {
+    console.error('❌ Genre/language determination failed:', error)
+    // Fallback to safe defaults
+    return {
+      genreSlug: 'fiction',
+      languageCode: 'en',
+      reasoning: 'Fallback due to analysis error'
+    }
+  }
 }
 
 /**
