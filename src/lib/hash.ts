@@ -26,9 +26,9 @@ export function createSearchHash(params: SearchParams): string {
   // Include pagination parameters for per-page caching
   const normalized = {
     freeText: params.freeText?.trim() || null,
-    languageCode: params.languageCode || null, // Allow null for AI-determined searches
-    genreSlug: params.genreSlug || null, // Allow null for AI-determined searches
-    tagSlugs: params.tagSlugs.sort(), // Sort tags for consistency
+    languageCode: params.languageCode || null,
+    genreSlug: params.genreSlug || null,
+    tagSlugs: params.tagSlugs.sort(),
     pageNumber: params.pageNumber,
     pageSize: params.pageSize,
     extraJson: params.extraJson || null

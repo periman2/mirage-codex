@@ -6,7 +6,8 @@ import { useChat } from '@ai-sdk/react'
 import { useAuth } from '@/lib/auth-context'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { ChevronLeft, ChevronRight, Bookmark, Share2, Eye, Heart } from 'lucide-react'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { ChevronLeft, ChevronRight, Bookmark, Share2, Eye, Heart, Type } from 'lucide-react'
 import { toast } from 'sonner'
 import Markdown from 'react-markdown'
 import { useBookStats, useBookLike, useBookView, usePageStats, usePageLike, usePageView, usePageContent } from '@/hooks/useBookStats'
@@ -38,6 +39,7 @@ export default function BookDetailPage() {
   const [isGenerating, setIsGenerating] = useState(false)
   const [isPageCached, setIsPageCached] = useState(false) // Track if page content is cached/saved
   const [isMobileBookInfoOpen, setIsMobileBookInfoOpen] = useState(false)
+  const [fontSize, setFontSize] = useState<'small' | 'medium' | 'large' | 'xl'>('medium')
 
 
   // Optimistic UI state
@@ -46,6 +48,22 @@ export default function BookDetailPage() {
 
   // Ref to prevent duplicate generation requests
   const generationInProgress = useRef(false)
+
+  // Font size utility function
+  const getFontSizeClasses = (size: typeof fontSize) => {
+    switch (size) {
+      case 'small':
+        return 'text-sm leading-relaxed'
+      case 'medium':
+        return 'text-base leading-relaxed'
+      case 'large':
+        return 'text-lg leading-relaxed'
+      case 'xl':
+        return 'text-xl leading-relaxed'
+      default:
+        return 'text-base leading-relaxed'
+    }
+  }
 
   // Function to replace image prompts with markdown image syntax
   const processImagePrompts = (content: string): string => {
@@ -286,20 +304,21 @@ export default function BookDetailPage() {
       return
     }
 
-    // Optimistic update
-    const currentLiked = optimisticBookLike?.liked ?? bookStats?.userLiked ?? false
-    const currentCount = optimisticBookLike?.count ?? bookStats?.likes ?? book?.stats?.likes ?? 0
-    const newLiked = !currentLiked
-    const newCount = newLiked ? currentCount + 1 : Math.max(0, currentCount - 1)
+    // Only set optimistic state if not already set (prevent double-setting)
+    if (optimisticBookLike === null) {
+      const currentLiked = bookStats?.userLiked ?? false
+      const currentCount = bookStats?.likes ?? book?.stats?.likes ?? 0
+      const newLiked = !currentLiked
+      const newCount = newLiked ? currentCount + 1 : Math.max(0, currentCount - 1)
 
-    setOptimisticBookLike({ liked: newLiked, count: newCount })
+      setOptimisticBookLike({ liked: newLiked, count: newCount })
+    }
 
     try {
       await bookLikeMutation.mutateAsync()
-      // Wait for refetch to complete before clearing optimistic state
-      await refetchBookStats()
-      // Small delay to ensure UI is stable
-      setTimeout(() => setOptimisticBookLike(null), 100)
+      // Clear optimistic state immediately when mutation succeeds
+      // The mutation's onSuccess will handle refetching
+      setOptimisticBookLike(null)
     } catch (error) {
       // Revert optimistic update on error
       setOptimisticBookLike(null)
@@ -320,18 +339,21 @@ export default function BookDetailPage() {
       return
     }
 
-    // Optimistic update
-    const currentLiked = optimisticPageLike?.liked ?? pageStats?.userLiked ?? false
-    const currentCount = optimisticPageLike?.count ?? pageStats?.likes ?? 0
-    const newLiked = !currentLiked
-    const newCount = newLiked ? currentCount + 1 : Math.max(0, currentCount - 1)
+    // Only set optimistic state if not already set (prevent double-setting)
+    if (optimisticPageLike === null) {
+      const currentLiked = pageStats?.userLiked ?? false
+      const currentCount = pageStats?.likes ?? 0
+      const newLiked = !currentLiked
+      const newCount = newLiked ? currentCount + 1 : Math.max(0, currentCount - 1)
 
-    setOptimisticPageLike({ liked: newLiked, count: newCount })
+      setOptimisticPageLike({ liked: newLiked, count: newCount })
+    }
 
     try {
       await pageLikeMutation.mutateAsync(currentEdition.id)
-      // Wait a bit for the mutation's onSuccess to refetch, then clear optimistic state
-      setTimeout(() => setOptimisticPageLike(null), 200)
+      // Clear optimistic state immediately when mutation succeeds
+      // The mutation's onSuccess will handle refetching
+      setOptimisticPageLike(null)
     } catch (error) {
       // Revert optimistic update on error
       setOptimisticPageLike(null)
@@ -399,7 +421,7 @@ export default function BookDetailPage() {
           <Card className="flex-1 bg-white/95 backdrop-blur-md border border-mirage-border-primary shadow-xl rounded-xl overflow-hidden">
             <div className="h-full flex flex-col">
               {/* Page Header */}
-              <div className="px-4 py-3 md:px-6 md:py-4 border-b border-mirage-border-primary bg-white/90">
+              <div className="px-4 py-3 md:px-6 md:py-4 border-b border-mirage-border-primary bg-white/90 flex-shrink-0">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
 
@@ -454,31 +476,23 @@ export default function BookDetailPage() {
                       >
                         <Share2 className="h-4 w-4 text-mirage-text-muted hover:text-amber-600 transition-colors" />
                       </button>
+
+                      {/* Font Size Selector */}
+                      <div className="flex items-center space-x-1">
+                        <Type className="h-4 w-4 text-mirage-text-muted" />
+                        <Select value={fontSize} onValueChange={(value: typeof fontSize) => setFontSize(value)}>
+                          <SelectTrigger className="h-8 w-20 text-xs border-mirage-border-primary bg-white/90">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="small" className="text-xs">Small</SelectItem>
+                            <SelectItem value="medium" className="text-sm">Medium</SelectItem>
+                            <SelectItem value="large" className="text-base">Large</SelectItem>
+                            <SelectItem value="xl" className="text-lg">Extra Large</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex space-x-2 md:space-x-3">
-                    <Button
-                      onClick={prevPage}
-                      disabled={currentPage <= 1}
-                      variant="outline"
-                      size="sm"
-                      className="h-8 px-2 md:h-10 md:px-4 text-xs md:text-sm bg-white/90 border-mirage-border-primary"
-                    >
-                      <ChevronLeft className="h-3 w-3 md:h-4 md:w-4 mr-1 md:mr-2" />
-                      <span className="hidden sm:inline">Previous</span>
-                      <span className="sm:hidden">Prev</span>
-                    </Button>
-                    <Button
-                      onClick={nextPage}
-                      disabled={!book || currentPage >= book.pageCount}
-                      variant="outline"
-                      size="sm"
-                      className="h-8 px-2 md:h-10 md:px-4 text-xs md:text-sm bg-white/90 border-mirage-border-primary"
-                    >
-                      <span className="hidden sm:inline">Next</span>
-                      <span className="sm:hidden">Next</span>
-                      <ChevronRight className="h-3 w-3 md:h-4 md:w-4 ml-1 md:ml-2" />
-                    </Button>
                   </div>
                 </div>
               </div>
@@ -507,12 +521,12 @@ export default function BookDetailPage() {
                             h1: ({ children }) => <h1 className="text-2xl font-bold text-mirage-text-primary mb-4">{children}</h1>,
                             h2: ({ children }) => <h2 className="text-xl font-semibold text-mirage-text-primary mb-3">{children}</h2>,
                             h3: ({ children }) => <h3 className="text-lg font-medium text-mirage-text-primary mb-2">{children}</h3>,
-                            p: ({ children }) => <p className="text-mirage-text-primary leading-relaxed mb-4">{children}</p>,
+                            p: ({ children }) => <p className={`text-mirage-text-primary mb-4 ${getFontSizeClasses(fontSize)}`}>{children}</p>,
                             em: ({ children }) => <em className="text-mirage-text-secondary italic">{children}</em>,
                             strong: ({ children }) => <strong className="text-mirage-text-primary font-semibold">{children}</strong>,
-                            ul: ({ children }) => <ul className="list-disc list-inside mb-4 text-mirage-text-primary space-y-1">{children}</ul>,
-                            ol: ({ children }) => <ol className="list-decimal list-inside mb-4 text-mirage-text-primary space-y-1">{children}</ol>,
-                            blockquote: ({ children }) => <blockquote className="border-l-4 border-mirage-border-primary pl-4 italic text-mirage-text-secondary mb-4">{children}</blockquote>,
+                            ul: ({ children }) => <ul className={`list-disc list-inside mb-4 text-mirage-text-primary space-y-1 ${getFontSizeClasses(fontSize)}`}>{children}</ul>,
+                            ol: ({ children }) => <ol className={`list-decimal list-inside mb-4 text-mirage-text-primary space-y-1 ${getFontSizeClasses(fontSize)}`}>{children}</ol>,
+                            blockquote: ({ children }) => <blockquote className={`border-l-4 border-mirage-border-primary pl-4 italic text-mirage-text-secondary mb-4 ${getFontSizeClasses(fontSize)}`}>{children}</blockquote>,
                             img: ({ src, alt, ...props }) => (
                               <img 
                                 src={src} 
@@ -539,24 +553,24 @@ export default function BookDetailPage() {
                           h1: ({ children }) => <h1 className="text-2xl font-bold text-mirage-text-primary mb-4">{children}</h1>,
                           h2: ({ children }) => <h2 className="text-xl font-semibold text-mirage-text-primary mb-3">{children}</h2>,
                           h3: ({ children }) => <h3 className="text-lg font-medium text-mirage-text-primary mb-2">{children}</h3>,
-                          p: ({ children }) => <p className="text-mirage-text-primary leading-relaxed mb-4">{children}</p>,
+                          p: ({ children }) => <p className={`text-mirage-text-primary mb-4 ${getFontSizeClasses(fontSize)}`}>{children}</p>,
                           em: ({ children }) => <em className="text-mirage-text-secondary italic">{children}</em>,
                           strong: ({ children }) => <strong className="text-mirage-text-primary font-semibold">{children}</strong>,
-                          ul: ({ children }) => <ul className="list-disc list-inside mb-4 text-mirage-text-primary space-y-1">{children}</ul>,
-                          ol: ({ children }) => <ol className="list-decimal list-inside mb-4 text-mirage-text-primary space-y-1">{children}</ol>,
-                          blockquote: ({ children }) => <blockquote className="border-l-4 border-mirage-border-primary pl-4 italic text-mirage-text-secondary mb-4">{children}</blockquote>,
-                                                      img: ({ src, alt, ...props }) => (
-                              <img 
-                                src={src} 
-                                alt={alt}
-                                className="w-full max-w-2xl mx-auto my-6 rounded-lg shadow-lg hover:scale-105 transition-transform duration-300"
-                                loading="lazy"
-                                style={{ display: 'block' }}
-                                {...props}
-                              />
-                            ),
+                          ul: ({ children }) => <ul className={`list-disc list-inside mb-4 text-mirage-text-primary space-y-1 ${getFontSizeClasses(fontSize)}`}>{children}</ul>,
+                          ol: ({ children }) => <ol className={`list-decimal list-inside mb-4 text-mirage-text-primary space-y-1 ${getFontSizeClasses(fontSize)}`}>{children}</ol>,
+                          blockquote: ({ children }) => <blockquote className={`border-l-4 border-mirage-border-primary pl-4 italic text-mirage-text-secondary mb-4 ${getFontSizeClasses(fontSize)}`}>{children}</blockquote>,
+                          img: ({ src, alt, ...props }) => (
+                            <img 
+                              src={src} 
+                              alt={alt}
+                              className="w-full max-w-2xl mx-auto my-6 rounded-lg shadow-lg hover:scale-105 transition-transform duration-300"
+                              loading="lazy"
+                              style={{ display: 'block' }}
+                              {...props}
+                            />
+                          ),
                         }}
-                                              >
+                      >
                           {processedPageContent}
                         </Markdown>
                     </div>
@@ -585,6 +599,44 @@ export default function BookDetailPage() {
                       </div>
                     </div>
                   )}
+                </div>
+              </div>
+
+              {/* Page Counter and Navigation - Fixed at Bottom */}
+              <div className="px-4 py-3 md:px-6 md:py-4 border-t border-mirage-border-primary bg-white/90 flex-shrink-0">
+                <div className="flex items-center justify-between">
+                  {/* Page Counter */}
+                  <div className="flex items-center space-x-2">
+                    <span className="text-sm text-mirage-text-secondary font-medium">
+                      Page {currentPage} of {book?.pageCount || '?'}
+                    </span>
+                  </div>
+
+                  {/* Navigation Buttons */}
+                  <div className="flex space-x-2 md:space-x-3">
+                    <Button
+                      onClick={prevPage}
+                      disabled={currentPage <= 1}
+                      variant="outline"
+                      size="sm"
+                      className="h-8 px-2 md:h-10 md:px-4 text-xs md:text-sm bg-white/90 border-mirage-border-primary"
+                    >
+                      <ChevronLeft className="h-3 w-3 md:h-4 md:w-4 mr-1 md:mr-2" />
+                      <span className="hidden sm:inline">Previous</span>
+                      <span className="sm:hidden">Prev</span>
+                    </Button>
+                    <Button
+                      onClick={nextPage}
+                      disabled={!book || currentPage >= book.pageCount}
+                      variant="outline"
+                      size="sm"
+                      className="h-8 px-2 md:h-10 md:px-4 text-xs md:text-sm bg-white/90 border-mirage-border-primary"
+                    >
+                      <span className="hidden sm:inline">Next</span>
+                      <span className="sm:hidden">Next</span>
+                      <ChevronRight className="h-3 w-3 md:h-4 md:w-4 ml-1 md:ml-2" />
+                    </Button>
+                  </div>
                 </div>
               </div>
             </div>

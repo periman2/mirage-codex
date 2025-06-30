@@ -71,9 +71,19 @@ export function useBookLike(bookId: string) {
 
       return response.json()
     },
-    onSuccess: () => {
-      // Invalidate and refetch book stats
-      queryClient.invalidateQueries({ queryKey: ['book-stats', bookId] })
+    onSuccess: (data) => {
+      // Update the cache directly instead of invalidating (prevents the GET refetch)
+      queryClient.setQueryData(
+        ['book-stats', bookId], 
+        (oldData: any) => {
+          if (!oldData) return oldData
+          return {
+            ...oldData,
+            userLiked: data.liked,
+            likes: data.likes
+          }
+        }
+      )
     }
   })
 }
@@ -183,11 +193,19 @@ export function usePageLike(bookId: string, pageNumber: number) {
 
       return response.json()
     },
-    onSuccess: (_, editionId) => {
-      // Invalidate and refetch page stats
-      queryClient.invalidateQueries({ 
-        queryKey: ['page-stats', bookId, pageNumber, editionId] 
-      })
+    onSuccess: (data, editionId) => {
+      // Update the cache directly instead of invalidating (prevents the GET refetch)
+      queryClient.setQueryData(
+        ['page-stats', bookId, pageNumber, editionId], 
+        (oldData: any) => {
+          if (!oldData) return oldData
+          return {
+            ...oldData,
+            userLiked: data.liked,
+            likes: data.likes
+          }
+        }
+      )
     }
   })
 }
