@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Sparks } from 'iconoir-react'
+import { CreditsIcon } from '@/components/ui/credits-icon'
 import { Heart, Users } from 'lucide-react'
 
 // Transform database result to frontend-friendly format
@@ -66,7 +66,7 @@ export function BookSearchResultCard({ book }: { book: SearchResultBook }) {
             {imageLoading && (
               <div className="absolute inset-0 bg-gradient-to-br from-amber-100 to-amber-200 dark:from-amber-900 dark:to-amber-800 flex items-center justify-center z-10">
                 <div className="flex flex-col items-center space-y-2">
-                  <Sparks className="h-8 w-8 text-amber-600 dark:text-amber-300 animate-spin" />
+                  <CreditsIcon className="h-8 w-8 text-amber-600 dark:text-amber-300 animate-spin" />
                   <div className="text-sm text-amber-700 dark:text-amber-200 font-medium">
                     Loading...
                   </div>

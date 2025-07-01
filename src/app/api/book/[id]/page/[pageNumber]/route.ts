@@ -15,7 +15,7 @@ interface RouteParams {
 }
 
 // Configuration constants
-const CONTEXT_PAGES_COUNT = 20 // Number of previous pages to include for context
+const CONTEXT_PAGES_COUNT = 30 // Number of previous pages to include for context
 const DEFAULT_TEMPERATURE = 0.8 // Fallback temperature if genre doesn't specify
 
 // Allow streaming responses up to 60 seconds
@@ -141,6 +141,47 @@ export async function POST(
         { status: 404 }
       )
     }
+
+    // Get the original search query that generated this book
+    console.log('🔍 Fetching original search query for book:', editionDetails.book_id)
+    const { data: searchContext } = await supabase
+      .from('search_books')
+      .select(`
+        searches (
+          id,
+          search_params (
+            free_text,
+            tag_ids
+          )
+        )
+      `)
+      .eq('book_id', editionDetails.book_id)
+      .limit(1)
+      .single()
+
+    // Extract search context
+    let originalSearchQuery = null
+    let searchTags: string[] = []
+    
+    if (searchContext?.searches?.search_params) {
+      originalSearchQuery = searchContext.searches.search_params.free_text
+      const tagIds = searchContext.searches.search_params.tag_ids || []
+      
+      // Get tag names if there are tag IDs
+      if (tagIds.length > 0) {
+        const { data: tags } = await supabase
+          .from('tags')
+          .select('label')
+          .in('id', tagIds)
+        
+        searchTags = tags?.map(tag => tag.label) || []
+      }
+    }
+
+    console.log('🔍 Original search context:', { 
+      originalSearchQuery, 
+      searchTags: searchTags.length > 0 ? searchTags : 'none' 
+    })
 
     // Check authentication and credits
     console.log('👤 Checking authentication and credits...')
@@ -290,6 +331,16 @@ You are writing as ${editionDetails.books.authors.pen_name}, and you must embody
 
 **Book Summary:** ${editionDetails.books.summary}
 
+${originalSearchQuery || searchTags.length > 0 ? `## ORIGINAL CREATIVE INTENT
+This book was generated based on the following user request, which might provide crucial context for how the book should unfold and what themes should be explored:
+
+${originalSearchQuery ? `**User's Original Query:** "${originalSearchQuery}"` : ''}
+${searchTags.length > 0 ? `**Additional Themes/Tags:** ${searchTags.join(', ')}` : ''}
+
+Keep this original creative intent in mind as you write this page. The story should honor and develop the themes, concepts, and direction implied by this original request. This context is vital for maintaining consistency with the reader's expectations and the book's intended narrative arc.
+
+` : ''}
+
 ## BOOK STRUCTURE & CONTENT ORGANIZATION
 ${sections && sections.length > 0 ? `
 This book is organized into ${sections.length} sections. Here's the complete structure:
@@ -356,9 +407,18 @@ ${currentSection ? `- Remember you are ${sectionProgress.replace('(', '').replac
       }
 
       const debugFile = path.join(debugDir, `system-prompt-${editionDetails.books.id}-page-${pageNumber}.txt`)
-      fs.writeFileSync(debugFile, systemPrompt)
+      
+      // Include search context in debug file header
+      const debugContent = `=== SEARCH CONTEXT ===
+Original Query: ${originalSearchQuery || 'None'}
+Search Tags: ${searchTags.length > 0 ? searchTags.join(', ') : 'None'}
 
-      console.log('📝 System prompt written to:', debugFile)
+=== SYSTEM PROMPT ===
+${systemPrompt}`
+      
+      fs.writeFileSync(debugFile, debugContent)
+
+      console.log('📝 System prompt with search context written to:', debugFile)
     }
 
     // Use the messages from the request (for useChat compatibility)
@@ -369,6 +429,14 @@ ${currentSection ? `- Remember you are ${sectionProgress.replace('(', '').replac
     ]
 
     console.log('🤖 Starting streaming generation with provider:', editionDetails.models.name)
+    console.log('🎯 Generation context:', {
+      originalQuery: originalSearchQuery || 'None',
+      searchTags: searchTags.length > 0 ? searchTags : 'None',
+      currentPage: pageNumber,
+      totalPages: editionDetails.books.page_count,
+      genre: genre.label,
+      author: editionDetails.books.authors.pen_name
+    })
 
     const result = streamText({
       model: aiProvider,

@@ -74,6 +74,12 @@ export function Navbar() {
               >
                 Search {!user && '(Login Required)'}
               </button>
+              <a 
+                href="/about" 
+                className="text-sm text-slate-700 hover:text-amber-700 dark:text-amber-100 dark:hover:text-amber-200 transition-colors"
+              >
+                About
+              </a>
 
               {/* Credits display for authenticated users */}
               {user && (
@@ -125,6 +131,13 @@ export function Navbar() {
               >
                 Search {!user && '(Login Required)'}
               </button>
+              <a 
+                href="/about" 
+                className="block px-2 py-1 text-sm text-slate-700 hover:text-amber-700 dark:text-amber-100 dark:hover:text-amber-200 transition-colors"
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
+                About
+              </a>
 
               {/* Credits display for authenticated users - mobile */}
               {user && (

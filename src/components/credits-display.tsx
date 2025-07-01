@@ -1,6 +1,7 @@
 'use client'
 
-import { Coins, Spark } from 'iconoir-react'
+import { Coins } from 'iconoir-react'
+import { CreditsIcon } from '@/components/ui/credits-icon'
 import { useCredits } from '@/hooks/useCredits'
 import { useAuth } from '@/lib/auth-context'
 
@@ -27,7 +28,7 @@ export function CreditsDisplay({
   if (isLoading) {
     return (
       <div className={`flex items-center gap-1.5 ${className}`}>
-        <Spark className={`${getSizeClasses(size)} text-amber-600 dark:text-amber-400 animate-pulse`} />
+        <CreditsIcon className={`${getSizeClasses(size)} text-amber-600 dark:text-amber-400 animate-pulse`} />
         {showLabel && (
           <span className={`${getTextSizeClasses(size)} text-slate-600 dark:text-slate-300 animate-pulse`}>
             ---
@@ -40,7 +41,7 @@ export function CreditsDisplay({
   if (error || !credits) {
     return (
       <div className={`flex items-center gap-1.5 ${className}`}>
-        <Spark className={`${getSizeClasses(size)} text-red-500`} />
+        <CreditsIcon className={`${getSizeClasses(size)} text-red-500`} />
         {showLabel && (
           <span className={`${getTextSizeClasses(size)} text-red-500`}>
             Error
@@ -55,7 +56,7 @@ export function CreditsDisplay({
 
   const content = (
     <>
-      <Spark className={`${getSizeClasses(size)} text-amber-600 dark:text-amber-400 flex-shrink-0`} />
+      <CreditsIcon className={`${getSizeClasses(size)} text-amber-600 dark:text-amber-400 flex-shrink-0`} />
       {showLabel && (
         <span className={`${getTextSizeClasses(size)} text-slate-700 dark:text-slate-200 font-medium`}>
           {credits.credits.toLocaleString()}

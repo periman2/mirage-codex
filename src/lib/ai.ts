@@ -4,8 +4,8 @@ import { anthropic } from '@ai-sdk/anthropic'
 import { google } from '@ai-sdk/google'
 import { z } from 'zod'
 
-console.log('OPENAI_API_KEY: ', process.env.OPENAI_API_KEY);
 const openaiModel = createOpenAI({ apiKey: process.env.OPENAI_API_KEY || '' });
+
 // Constants
 export const PAGE_SIZE = 3 // Number of books generated per search
 

@@ -10,7 +10,7 @@ import { Database, Tables } from '@/lib/database.types'
 // Use database types for better type safety
 
 const SearchRequestSchema = z.object({
-  freeText: z.string().optional(),
+  freeText: z.string().max(10000, 'Search query cannot exceed 10,000 characters').optional(),
   languageCode: z.string().optional(),
   genreSlug: z.string().optional(),
   tagSlugs: z.array(z.string()).default([]),
@@ -161,8 +161,21 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     console.log('📝 Request body:', JSON.stringify(body, null, 2))
     
-    const validatedInput = SearchRequestSchema.parse(body)
-    console.log('✅ Input validated:', validatedInput)
+    let validatedInput
+    try {
+      validatedInput = SearchRequestSchema.parse(body)
+      console.log('✅ Input validated:', validatedInput)
+    } catch (validationError) {
+      if (validationError instanceof z.ZodError) {
+        console.log('❌ Validation error:', validationError.errors)
+        const errorMessage = validationError.errors.map(err => `${err.path.join('.')}: ${err.message}`).join(', ')
+        return NextResponse.json(
+          { error: `Validation failed: ${errorMessage}` },
+          { status: 400 }
+        )
+      }
+      throw validationError
+    }
     
     // Create hash FIRST with user's original input (before AI determination)
     // This allows us to check cache before spending AI credits

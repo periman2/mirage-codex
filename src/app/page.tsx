@@ -98,11 +98,22 @@ export default function HomePage() {
               className="backdrop-blur-sm bg-transparent rounded-2xl p-4 md:p-6 border"
               style={{ borderColor: 'rgba(217, 119, 6, 0.1)' }}
             >
-              <p className="text-base md:text-lg text-slate-800 dark:text-amber-50 leading-relaxed max-w-3xl mx-auto">
+              <p className="text-base md:text-lg text-slate-800 dark:text-amber-50 leading-relaxed max-w-3xl mx-auto mb-4">
                 A living archive born from the collective imagination. 
                 <br />
                 This library is been generated while you are searching inside of it.
               </p>
+              
+              {/* Learn More Button */}
+              <div className="flex justify-center">
+                <button
+                  onClick={() => router.push('/about')}
+                  className="text-sm text-amber-700 dark:text-amber-300 hover:text-amber-800 dark:hover:text-amber-200 transition-colors duration-300 underline underline-offset-4 decoration-1 hover:decoration-2"
+                  style={{ fontFamily: 'var(--font-playfair-display), serif' }}
+                >
+                  Learn More
+                </button>
+              </div>
             </div>
           </div>
         </div>

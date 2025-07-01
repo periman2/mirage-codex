@@ -6,8 +6,6 @@ import { useAuth } from '@/lib/auth-context'
 import { useLanguages, useGenres, useTagsByGenre, useModels } from '@/lib/queries'
 import { useMutation } from '@tanstack/react-query'
 import { useCredits } from '@/hooks/useCredits'
-import { Coins } from 'iconoir-react'
-import type { Tables } from '@/lib/database.types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -16,7 +14,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge'
 import { BookSearchResultCard } from '@/components/book-search-result-card'
 import { AuthButton } from '@/components/auth-button'
-import { Search, Sparks, Book, ArrowLeft, ArrowRight, Filter, WarningTriangle, Refresh } from 'iconoir-react'
+import { Search, Book, ArrowLeft, ArrowRight, Filter, WarningTriangle, Refresh } from 'iconoir-react'
+import { CreditsIcon } from '@/components/ui/credits-icon'
 import { toast } from 'sonner'
 
 type SearchResultBook = {
@@ -587,7 +586,7 @@ function SearchPageContent() {
             >
               {searchMutation.isPending ? (
                 <>
-                  <Sparks className="h-4 w-4 mr-2 animate-spin" style={{ color: 'white' }} />
+                  <CreditsIcon className="h-4 w-4 mr-2 animate-spin" style={{ color: 'white' }} />
                   <span style={{ color: 'white' }}>Searching...</span>
                 </>
               ) : (
@@ -596,8 +595,8 @@ function SearchPageContent() {
                   <span style={{ color: 'white' }}>
                     Search Books
                     {selectedModel?.search_credits && (
-                      <span className="ml-1">
-                        (<Coins className="h-3 w-3 inline mx-1" />{selectedModel.search_credits})
+                                              <span className="ml-1">
+                        (<CreditsIcon className="h-3 w-3 inline mx-1" />{selectedModel.search_credits})
                       </span>
                     )}
                   </span>
@@ -628,7 +627,7 @@ function SearchPageContent() {
                 onKeyPress={handleKeyPress}
                 placeholder="Describe your ideal book... (e.g., A mystery novel set in Victorian London)"
                 className="h-12 text-base bg-white/90 border-mirage-border-primary pr-12"
-                maxLength={2000}
+                maxLength={10000}
               />
               <Button
                 onClick={handleSearch}
@@ -642,7 +641,7 @@ function SearchPageContent() {
                 title={selectedModel?.search_credits ? `Search (${selectedModel.search_credits} credits)` : 'Search'}
               >
                 {searchMutation.isPending ? (
-                  <Sparks className="h-4 w-4 animate-spin" style={{ color: 'white' }} />
+                  <CreditsIcon className="h-4 w-4 animate-spin" style={{ color: 'white' }} />
                 ) : (
                   <Search className="h-4 w-4" style={{ color: 'white' }} />
                 )}
@@ -650,13 +649,13 @@ function SearchPageContent() {
 
               {/* Character Count */}
               <div className="flex justify-end mt-1">
-                <span className={`text-xs transition-colors ${searchQuery.length > 1800
+                <span className={`text-xs transition-colors ${searchQuery.length > 9500
                     ? 'text-red-500'
-                    : searchQuery.length > 1500
+                    : searchQuery.length > 8000
                       ? 'text-mirage-accent-primary'
                       : 'text-mirage-text-muted'
                   }`}>
-                  {searchQuery.length}/2000
+                  {searchQuery.length}/10000
                 </span>
               </div>
             </div>
@@ -671,7 +670,7 @@ function SearchPageContent() {
                 <div className="flex items-center justify-center h-full">
                   <div className="text-center">
                     <div className="relative mb-4">
-                      <Sparks className="h-12 w-12 text-mirage-accent-primary animate-spin mx-auto" />
+                      <CreditsIcon className="h-12 w-12 text-mirage-accent-primary animate-spin mx-auto" />
                       <div className="absolute inset-0 rounded-full border-2 border-mirage-border-primary/30 animate-pulse"></div>
                     </div>
                     <h3 className="text-xl font-semibold text-mirage-text-primary mb-2">
@@ -789,7 +788,7 @@ export default function SearchPage() {
     <Suspense fallback={
       <div className="flex h-[calc(100vh-4rem)] items-center justify-center bg-mirage-gradient">
         <div className="text-center">
-          <Sparks className="h-12 w-12 text-mirage-accent-primary animate-spin mx-auto mb-4" />
+          <CreditsIcon className="h-12 w-12 text-mirage-accent-primary animate-spin mx-auto mb-4" />
           <h3 className="text-xl font-semibold text-mirage-text-primary mb-2">
             Loading search page...
           </h3>

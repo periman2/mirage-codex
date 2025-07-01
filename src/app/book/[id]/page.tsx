@@ -8,11 +8,11 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { ChevronLeft, ChevronRight, Bookmark, Share2, Eye, Heart, Type } from 'lucide-react'
-import { Coins, Spark } from 'iconoir-react'
+import { CreditsIcon } from '@/components/ui/credits-icon'
 import { toast } from 'sonner'
 import Markdown from 'react-markdown'
 import { useBookStats, useBookLike, useBookView, usePageStats, usePageLike, usePageView, usePageContent } from '@/hooks/useBookStats'
-import { useBookData, type BookData, type BookEdition } from '@/hooks/useBookData'
+import { useBookData } from '@/hooks/useBookData'
 import { useBookmarks } from '@/hooks/useBookmarks'
 import { usePageGenerationCreditCost } from '@/hooks/useCreditCosts'
 import { useCredits } from '@/hooks/useCredits'
@@ -107,7 +107,7 @@ export default function BookDetailPage() {
     if (willPageRequireGeneration(pageNumber) && pageGenerationCreditCost) {
       return (
         <span className="ml-1">
-          (<Spark className={`inline ${isSmall ? 'h-2 w-2 mx-0.5' : 'h-3 w-3 mx-1'}`} />{pageGenerationCreditCost})
+          (<CreditsIcon className={`inline ${isSmall ? 'h-2 w-2 mx-0.5' : 'h-3 w-3 mx-1'}`} />{pageGenerationCreditCost})
         </span>
       )
     }
@@ -491,7 +491,6 @@ export default function BookDetailPage() {
         <BookInfoSidebar
           book={book}
           currentEdition={currentEdition}
-          currentPage={currentPage}
           isOpen={isMobileBookInfoOpen}
           onClose={() => setIsMobileBookInfoOpen(false)}
           onOpen={() => setIsMobileBookInfoOpen(true)}
@@ -509,14 +508,10 @@ export default function BookDetailPage() {
         <div className="flex-1 p-4 md:p-4 pt-16 md:pt-4 flex flex-col">
           <Card className="flex-1 bg-white/95 backdrop-blur-md border border-mirage-border-primary shadow-xl rounded-xl overflow-hidden">
             <div className="h-full flex flex-col">
-              {/* Page Header */}
               <div className="px-4 py-3 md:px-6 md:py-4 border-b border-mirage-border-primary bg-white/90 flex-shrink-0">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-
-                    {/* Page stats and actions */}
                     <div className="flex items-center gap-3">
-                      {/* Page Like Button */}
                       {user ? (
                         <button
                           onClick={handlePageLike}

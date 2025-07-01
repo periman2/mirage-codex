@@ -26,7 +26,6 @@ interface Bookmark {
 interface BookInfoSidebarProps {
   book: BookData
   currentEdition: BookEdition | undefined
-  currentPage: number
   isOpen: boolean
   onClose: () => void
   onOpen: () => void
@@ -43,7 +42,6 @@ interface BookInfoSidebarProps {
 export function BookInfoSidebar({
   book,
   currentEdition,
-  currentPage,
   isOpen,
   onClose,
   onOpen,
@@ -248,13 +246,6 @@ export function BookInfoSidebar({
                   Sign in for Bookmarks
                 </Button>
               )}
-            </div>
-
-            {/* Page Info */}
-            <div className="text-center">
-              <span className="text-base text-mirage-text-tertiary font-medium">
-                Page {currentPage} of {book.pageCount}
-              </span>
             </div>
           </div>
         </div>
