@@ -85,7 +85,8 @@ export async function POST(
       const pageGenerationCreditCost = await getPageGenerationCreditCost(editionDetails.model_id)
       console.log(`💳 Deducting ${pageGenerationCreditCost} credits for saved page`)
       
-      const { data: deductionSuccess, error: deductionError } = await supabase
+      // Use admin client for credit deduction to ensure proper permissions
+      const { data: deductionSuccess, error: deductionError } = await adminSupabase
         .rpc('deduct_user_credits', {
           p_user_id: user.id,
           p_credits_to_deduct: pageGenerationCreditCost,

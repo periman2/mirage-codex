@@ -12,6 +12,7 @@ export const queryKeys = {
     details: () => [...queryKeys.books.all, 'detail'] as const,
     detail: (id: string) => [...queryKeys.books.details(), id] as const,
     userSearched: (userId: string, limit: number) => [...queryKeys.books.all, 'userSearched', userId, limit] as const,
+    userLiked: (userId: string, limit: number) => [...queryKeys.books.all, 'userLiked', userId, limit] as const,
     latest: (limit: number) => [...queryKeys.books.all, 'latest', limit] as const,
     byGenre: (genreSlug: string, limit: number) => [...queryKeys.books.all, 'byGenre', genreSlug, limit] as const,
     random: () => [...queryKeys.books.all, 'random'] as const,
@@ -326,6 +327,71 @@ export function useUserSearchedBooks(userId: string, limit: number = 10) {
     initialPageParam: 0,
     enabled: !!userId,
     staleTime: 5 * 60 * 1000, // 5 minutes
+  })
+}
+
+// User's liked books (most recently liked first)
+export function useUserLikedBooks(userId: string, limit: number = 10) {
+  const supabase = createSupabaseBrowserClient()
+  
+  return useInfiniteQuery({
+    queryKey: queryKeys.books.userLiked(userId, limit),
+    queryFn: async ({ pageParam = 0 }) => {
+      const from = pageParam * limit
+      const to = from + limit - 1
+      
+      const { data, error } = await supabase
+        .from('book_reactions')
+        .select(`
+          books (
+            *,
+            authors (
+              id,
+              pen_name,
+              bio
+            ),
+            languages (
+              id,
+              code,
+              label
+            ),
+            genres (
+              id,
+              slug,
+              label
+            ),
+            editions (
+              id,
+              model_id,
+              language_id,
+              models (
+                id,
+                name
+              )
+            ),
+            book_stats (
+              likes_cnt,
+              views_cnt
+            )
+          )
+        `)
+        .eq('user_id', userId)
+        .eq('reaction_type', 'like')
+        .order('created_at', { ascending: false })
+        .range(from, to)
+      
+      if (error) throw error
+      
+      // Extract books and transform them
+      const books = data?.map(reaction => reaction.books).filter(Boolean) || []
+      return books.map(transformBookWithStats).filter(Boolean)
+    },
+    getNextPageParam: (lastPage, allPages) => {
+      return lastPage.length === limit ? allPages.length : undefined
+    },
+    initialPageParam: 0,
+    enabled: !!userId,
+    staleTime: 2 * 60 * 1000, // 2 minutes - likes can change frequently
   })
 }
 

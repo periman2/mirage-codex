@@ -4,7 +4,7 @@ import { Suspense } from 'react'
 import { BookSection } from '@/components/book-grid'
 import { RandomizeButton } from '@/components/randomize-button'
 import { useAuth } from '@/lib/auth-context'
-import { useUserSearchedBooks, useLatestBooks, useBooksByGenre } from '@/lib/queries'
+import { useUserSearchedBooks, useUserLikedBooks, useLatestBooks, useBooksByGenre } from '@/lib/queries'
 import { useGenres } from '@/lib/queries'
 import Link from 'next/link'
 import { ArrowRight } from 'iconoir-react'
@@ -14,6 +14,7 @@ export default function BrowsePage() {
   
   // Fetch data for different sections using infinite queries
   const userBooksQuery = useUserSearchedBooks(user?.id || '', 10)
+  const userLikedBooksQuery = useUserLikedBooks(user?.id || '', 10)
   const latestBooksQuery = useLatestBooks(12)
   const { data: genres } = useGenres()
   
@@ -55,6 +56,17 @@ export default function BrowsePage() {
               title="Your Recent Discoveries"
               queryResult={userBooksQuery}
               href="/browse/recent"
+            />
+          </Suspense>
+        )}
+
+        {/* User's Liked Books - Only show if user is logged in */}
+        {user && (
+          <Suspense fallback={<BookSectionSkeleton title="Recently Liked Books" />}>
+            <ClickableBookSection 
+              title="Recently Liked Books"
+              queryResult={userLikedBooksQuery}
+              href="/browse/liked"
             />
           </Suspense>
         )}
