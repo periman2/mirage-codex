@@ -13,7 +13,7 @@ import {
   SheetTrigger 
 } from './ui/sheet'
 import { useAuth } from '@/lib/auth-context'
-import { User, Settings, LogOut, CreditCard } from 'iconoir-react'
+import { User, Settings, LogOut, CreditCard, Bookmark } from 'iconoir-react'
 
 export function UserMenu() {
   const { user, profile, signOut } = useAuth()
@@ -99,6 +99,18 @@ export function UserMenu() {
             >
               <CreditCard className="mr-2 h-4 w-4" />
               Billing & Credits
+            </Button>
+
+            <Button 
+              variant="ghost" 
+              className="w-full justify-start"
+              onClick={() => {
+                setIsProfileOpen(false)
+                router.push('/bookmarks')
+              }}
+            >
+              <Bookmark className="mr-2 h-4 w-4" />
+              My Bookmarks
             </Button>
 
             <Button 
