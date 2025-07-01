@@ -38,8 +38,8 @@ export default function BookDetailPage() {
   // Get credit cost for page generation
   const { data: pageGenerationCreditCost } = usePageGenerationCreditCost(currentEdition?.modelId || null)
   
-  // Credits hook for invalidation
-  const { invalidateCredits } = useCredits()
+  // Credits hook for invalidation and checking balance
+  const { invalidateCredits, credits: userCredits } = useCredits()
 
   const [currentPage, setCurrentPage] = useState(() => {
     const pageParam = searchParams?.get('page')
@@ -90,6 +90,15 @@ export default function BookDetailPage() {
     return true
   }
 
+  // Helper function to check if user has enough credits for page generation
+  const hasEnoughCreditsForPage = (pageNumber: number) => {
+    if (!user) return false // Not authenticated
+    if (!willPageRequireGeneration(pageNumber)) return true // Page doesn't need generation
+    if (!pageGenerationCreditCost || !userCredits) return true // Can't check, assume true
+    
+    return userCredits.credits >= pageGenerationCreditCost
+  }
+
   // Helper function to render credit cost indicator with loading state
   const renderCreditCost = (pageNumber: number, isSmall: boolean = false) => {
     if (!user) return null
@@ -114,6 +123,18 @@ export default function BookDetailPage() {
     
     return null
   }
+
+  // Function to find which section the current page belongs to
+  const getCurrentSection = () => {
+    if (!book?.sections || !currentPage) return null
+
+    return book.sections.find(section => 
+      currentPage >= section.fromPage && currentPage <= section.toPage
+    )
+  }
+
+  // Get the current section
+  const currentSection = getCurrentSection()
 
   // Font size utility function
   const getFontSizeClasses = (size: typeof fontSize) => {
@@ -191,9 +212,29 @@ export default function BookDetailPage() {
       setIsGenerating(false)
       generationInProgress.current = false
     },
-    onError: (error) => {
+    onError: async (error) => {
       console.error('❌ Page generation error:', error)
-      toast.error('Failed to generate page content')
+      
+      // Try to parse the error response to check for credit-related errors
+      let errorMessage = 'Failed to generate page content'
+      
+      // Check if error contains response information
+      if (error.message) {
+        try {
+          // If the error message contains JSON, it might be from our API
+          const errorData = JSON.parse(error.message)
+          if (errorData.creditsNeeded && errorData.message) {
+            errorMessage = errorData.message
+          }
+        } catch {
+          // If parsing fails, check for specific error messages
+          if (error.message.includes('credits') || error.message.includes('402')) {
+            errorMessage = 'Insufficient credits for page generation. Please upgrade your plan or add more credits.'
+          }
+        }
+      }
+      
+      toast.error(errorMessage)
       setIsGenerating(false)
       generationInProgress.current = false
     }
@@ -362,6 +403,13 @@ export default function BookDetailPage() {
   const nextPage = () => {
     if (book && currentPage < book.pageCount) {
       const newPage = currentPage + 1
+      
+      // Check if user has enough credits if page will require generation
+      if (willPageRequireGeneration(newPage) && !hasEnoughCreditsForPage(newPage)) {
+        toast.error(`You need ${pageGenerationCreditCost || 0} credits to generate this page. Please upgrade your plan or add more credits.`)
+        return
+      }
+      
       console.log(`➡️ Navigating to next page: ${currentPage} → ${newPage}`)
       setCurrentPage(newPage)
       updatePageURL(newPage, undefined, true) // Create history entry for navigation
@@ -371,6 +419,13 @@ export default function BookDetailPage() {
   const prevPage = () => {
     if (currentPage > 1) {
       const newPage = currentPage - 1
+      
+      // Check if user has enough credits if page will require generation
+      if (willPageRequireGeneration(newPage) && !hasEnoughCreditsForPage(newPage)) {
+        toast.error(`You need ${pageGenerationCreditCost || 0} credits to generate this page. Please upgrade your plan or add more credits.`)
+        return
+      }
+      
       console.log(`⬅️ Navigating to previous page: ${currentPage} → ${newPage}`)
       setCurrentPage(newPage)
       updatePageURL(newPage, undefined, true) // Create history entry for navigation
@@ -509,6 +564,15 @@ export default function BookDetailPage() {
           <Card className="flex-1 bg-white/95 backdrop-blur-md border border-mirage-border-primary shadow-xl rounded-xl overflow-hidden">
             <div className="h-full flex flex-col">
               <div className="px-4 py-3 md:px-6 md:py-4 border-b border-mirage-border-primary bg-white/90 flex-shrink-0">
+                {/* Section Information */}
+                {currentSection && (
+                  <div className="mb-3 pb-3 border-b border-mirage-border-primary/30">
+                    <h3 className="text-sm font-medium text-mirage-text-primary">
+                      {currentSection.title}
+                    </h3>
+                  </div>
+                )}
+                
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <div className="flex items-center gap-3">
