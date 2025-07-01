@@ -12,9 +12,10 @@ interface AuthDialogProps {
   isOpen: boolean
   onClose: () => void
   defaultMode?: 'login' | 'signup'
+  onSignInSuccess?: () => void
 }
 
-export function AuthDialog({ isOpen, onClose, defaultMode = 'login' }: AuthDialogProps) {
+export function AuthDialog({ isOpen, onClose, defaultMode = 'login', onSignInSuccess }: AuthDialogProps) {
   const [mode, setMode] = useState<'login' | 'signup' | 'forgot'>(defaultMode)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -31,11 +32,19 @@ export function AuthDialog({ isOpen, onClose, defaultMode = 'login' }: AuthDialo
       if (mode === 'login') {
         await signIn(email, password)
         toast.success('Welcome back!')
-        onClose()
+        if (onSignInSuccess) {
+          onSignInSuccess()
+        } else {
+          onClose()
+        }
       } else if (mode === 'signup') {
         await signUp(email, password, displayName)
         toast.success('Account created! Please check your email to verify your account.')
-        onClose()
+        if (onSignInSuccess) {
+          onSignInSuccess()
+        } else {
+          onClose()
+        }
       } else if (mode === 'forgot') {
         await resetPassword(email)
         toast.success('Password reset email sent! Check your inbox.')

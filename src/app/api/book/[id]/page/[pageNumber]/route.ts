@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { streamText } from 'ai'
 import { createSupabaseServerClient } from '@/lib/supabase'
 import { getAIProvider } from '@/lib/ai'
+import { getPageGenerationCreditCost } from '@/lib/credit-constants'
 import { PostHog } from 'posthog-node'
 import fs from 'fs'
 import path from 'path'
@@ -139,6 +140,71 @@ export async function POST(
         { error: 'Edition not found' },
         { status: 404 }
       )
+    }
+
+    // Check authentication and credits
+    console.log('👤 Checking authentication and credits...')
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    
+    if (authError || !user) {
+      console.log('❌ No authenticated user found')
+      return NextResponse.json(
+        { error: 'Authentication required for page generation' },
+        { status: 401 }
+      )
+    }
+
+    // Check for BYO API key first 
+    console.log('🔑 Checking for user API key...')
+    const { data: userApiKey } = await supabase
+      .from('user_api_keys')
+      .select('api_key_enc')
+      .eq('user_id', user.id)
+      .eq('domain_code', editionDetails.models.domain_code)
+      .single()
+
+    console.log('🔑 User API key found:', !!userApiKey)
+    const hasApiKey = !!userApiKey
+
+    // Check user credits if not using BYO key (but don't deduct yet)
+    if (!hasApiKey) {
+      const pageGenerationCreditCost = await getPageGenerationCreditCost(editionDetails.model_id)
+      console.log(`💰 Page generation will cost ${pageGenerationCreditCost} credits for model ${editionDetails.model_id}`)
+      
+      console.log('💳 Checking if user has enough credits...')
+      
+      const { data: hasEnoughCredits, error: creditCheckError } = await supabase
+        .rpc('check_user_credits', { 
+          p_user_id: user.id, 
+          p_credits_needed: pageGenerationCreditCost 
+        })
+
+      if (creditCheckError) {
+        console.error('❌ Error checking credits:', creditCheckError)
+        return NextResponse.json(
+          { error: 'Failed to check user credits' },
+          { status: 500 }
+        )
+      }
+
+      console.log('💰 Credit check result:', hasEnoughCredits, 'needed:', pageGenerationCreditCost)
+
+      if (!hasEnoughCredits) {
+        console.log('❌ Insufficient credits')
+        return NextResponse.json(
+          { 
+            error: 'Insufficient credits for page generation',
+            creditsNeeded: pageGenerationCreditCost,
+            message: `You need ${pageGenerationCreditCost} credits to generate a page. Please upgrade your plan or add more credits.`
+          },
+          { status: 402 }
+        )
+      }
+      
+      console.log('✅ User has sufficient credits - proceeding with generation')
+      console.log('💡 Credits will be deducted when page is saved via /save endpoint')
+    } else {
+      console.log('⏭️ Using BYO API key - no credit check needed')
     }
 
     // Get previous pages content for context (last CONTEXT_PAGES_COUNT pages)
@@ -309,6 +375,9 @@ ${currentSection ? `- Remember you are ${sectionProgress.replace('(', '').replac
       messages: allMessages,
       temperature: modelTemperature
     })
+
+    // Note: Credit deduction happens in the save endpoint when page is actually saved
+    console.log('💡 Credits will be deducted when page is saved via /save endpoint')
 
     // Save the generated content to database after streaming completes
     // Note: We'll handle this in the frontend after streaming completes

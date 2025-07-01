@@ -1,0 +1,9 @@
+#Database Changes
+Whenever you need to make changes to the database, please use the supabase mcp.
+After you have succesfully made any changes to the database always regenerate the types using supabase mcp and saving it to the database.types.ts file.
+
+#Frontend
+Always use useQuery useInifiteQuery, useMutation and the rest of the tansact query request helpers for when you want to make any request.
+Abstract to logic to different components when it's convenient and helpful.
+Create separate hooks in order to abstract away similar logic with useStates, functions and callbacks that are needed to do one specific business unit in a component.
+DO NOT ADD staletime unless specified in the tansact requests.

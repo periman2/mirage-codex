@@ -1,9 +1,11 @@
 import { generateObject, generateText, streamText } from 'ai'
-import { openai } from '@ai-sdk/openai'
+import { createOpenAI, openai } from '@ai-sdk/openai'
 import { anthropic } from '@ai-sdk/anthropic'
 import { google } from '@ai-sdk/google'
 import { z } from 'zod'
 
+console.log('OPENAI_API_KEY: ', process.env.OPENAI_API_KEY);
+const openaiModel = createOpenAI({ apiKey: process.env.OPENAI_API_KEY || '' });
 // Constants
 export const PAGE_SIZE = 3 // Number of books generated per search
 
@@ -13,7 +15,7 @@ export const PAGE_SIZE = 3 // Number of books generated per search
 function createModel(domain: string, modelName: string) {
   switch (domain) {
     case 'openai':
-      return openai(modelName)
+      return openaiModel(modelName)
     case 'anthropic':
       return anthropic(modelName)
     case 'google':
@@ -82,9 +84,9 @@ export async function generateAuthors(params: {
   count: number
 }): Promise<Array<z.infer<typeof AuthorSchema>>> {
   console.log('generateAuthors called with count:', params.count, 'for genre:', params.genrePrompt)
-  
+
   const model = createModel(params.modelDomain, params.modelName)
-  
+
   const systemPrompt = `You are a curator of fictional authors who write in specific genres. Generate completely original, fictional authors that never existed.
 
 GENRE CONTEXT: ${params.genrePrompt}
@@ -109,7 +111,7 @@ CREATIVITY: Be highly creative and unexpected in your author creations. Think of
   for (let attempt = 1; attempt <= 3; attempt++) {
     try {
       console.log(`Author generation attempt ${attempt}/${3}`)
-      
+
       const result = await generateObject({
         model,
         system: systemPrompt,
@@ -120,21 +122,21 @@ CREATIVITY: Be highly creative and unexpected in your author creations. Think of
 
       console.log(`✅ Authors generated successfully on attempt ${attempt}`)
       return result.object.authors
-      
+
     } catch (error) {
       lastError = error as Error
       console.error(`❌ Author generation attempt ${attempt} failed:`, error)
-      
+
       if (attempt === 3) {
         console.error('💥 All author generation attempts failed')
         throw lastError
       }
-      
+
       // Wait before retry (exponential backoff)
       await new Promise(resolve => setTimeout(resolve, 1000 * attempt))
     }
   }
-  
+
   throw lastError || new Error('Author generation failed after all retries')
 }
 
@@ -149,13 +151,13 @@ export async function determineGenreAndLanguage(params: {
   modelDomain: string
 }): Promise<{ genreSlug: string; languageCode: string; reasoning: string }> {
   console.log('🔍 Determining genre and language from query:', params.freeText.substring(0, 100) + '...')
-  
+
   const model = createModel(params.modelDomain, params.modelName)
-  
+
   // Create context about available options
   const genreContext = params.availableGenres.map(g => `${g.slug}: ${g.label}`).join('\n')
   const languageContext = params.availableLanguages.map(l => `${l.code}: ${l.label}`).join('\n')
-  
+
   const systemPrompt = `You are a literary genre classifier and language detector. Your task is to analyze a user's book search query and determine:
 1. The most appropriate SINGLE genre from the available options
 2. The language the user is searching in
@@ -202,23 +204,23 @@ Return the exact slug/code from the available options, not custom values.`,
     })
 
     console.log('✅ Genre and language determined:', result.object)
-    
+
     // Validate that the returned values exist in our available options
     const genreExists = params.availableGenres.find(g => g.slug === result.object.genreSlug)
     const languageExists = params.availableLanguages.find(l => l.code === result.object.languageCode)
-    
+
     if (!genreExists) {
       console.warn('⚠️ AI returned invalid genre slug, falling back to fiction')
       result.object.genreSlug = 'fiction'
     }
-    
+
     if (!languageExists) {
       console.warn('⚠️ AI returned invalid language code, falling back to en')
       result.object.languageCode = 'en'
     }
-    
+
     return result.object
-    
+
   } catch (error) {
     console.error('❌ Genre/language determination failed:', error)
     // Fallback to safe defaults
@@ -245,7 +247,7 @@ export async function generateBooks(params: {
   authorPenNames?: string[] // Optional - will assign authors randomly after generation
 }): Promise<{ books: Array<z.infer<typeof BookSchema>> }> {
   console.log('generateBooks called without author assignment')
-  
+
   const model = createModel(params.modelDomain, params.modelName)
 
   // Build the system prompt
@@ -316,14 +318,14 @@ export async function generatePageStreaming(params: {
   onError: (error: Error) => void
 }): Promise<void> {
   console.log('🔄 Starting page generation streaming for page:', params.pageNumber)
-  
+
   const model = createModel(params.modelDomain, params.modelName)
 
   // Find which section this page belongs to
-  const currentSection = params.sections.find(section => 
+  const currentSection = params.sections.find(section =>
     params.pageNumber >= section.fromPage && params.pageNumber <= section.toPage
   )
-  
+
   if (!currentSection) {
     const error = new Error(`No section found for page ${params.pageNumber}`)
     params.onError(error)
@@ -337,7 +339,7 @@ export async function generatePageStreaming(params: {
 
   // Build context about genre and formatting based on book title and author style
   const genreContext = getGenreFormattingHints(params.bookTitle, params.authorStyle)
-  
+
   const systemPrompt = `You are writing page ${params.pageNumber} of ${params.totalPages} for the book "${params.bookTitle}" by ${params.authorName}.
 
 AUTHOR STYLE: ${params.authorStyle}
@@ -392,7 +394,7 @@ Write compelling, immersive content that draws readers into this fictional world
 
     console.log('✅ Page generation streaming completed')
     params.onFinish(fullContent)
-    
+
   } catch (error) {
     console.error('❌ Page generation streaming failed:', error)
     params.onError(error instanceof Error ? error : new Error('Unknown error'))
@@ -405,32 +407,32 @@ Write compelling, immersive content that draws readers into this fictional world
 function getGenreFormattingHints(bookTitle: string, authorStyle: string): string {
   const title = bookTitle.toLowerCase()
   const style = authorStyle.toLowerCase()
-  
+
   // Detect likely genre/format based on title and style
   if (title.includes('cookbook') || title.includes('recipe') || style.includes('cooking')) {
     return `- Format as a cookbook with ingredient lists, step-by-step instructions
 - Use clear numbered steps and ingredient measurements
 - Include cooking tips and techniques`
   }
-  
+
   if (title.includes('manual') || title.includes('guide') || title.includes('how to')) {
     return `- Format as a practical guide with clear instructions
 - Use numbered lists and bullet points where appropriate
 - Include helpful tips and warnings`
   }
-  
+
   if (title.includes('poetry') || title.includes('poems') || style.includes('poetic')) {
     return `- Format as poetry with proper line breaks and stanza divisions
 - Use poetic language and imagery
 - Consider different poem forms and styles`
   }
-  
+
   if (title.includes('academic') || title.includes('research') || style.includes('scholarly')) {
     return `- Format as academic text with formal language
 - Include theoretical discussions and analysis
 - Use academic tone and structure`
   }
-  
+
   // Default to narrative fiction
   return `- Format as narrative prose with dialogue and descriptions
 - Use proper paragraph structure for readability
@@ -439,139 +441,37 @@ function getGenreFormattingHints(bookTitle: string, authorStyle: string): string
 }
 
 /**
- * Generate content for a specific page of a book (legacy non-streaming version)
- */
-export async function generatePage(params: {
-  bookTitle: string
-  authorName: string
-  authorStyle: string
-  pageNumber: number
-  totalPages: number
-  sections: Array<z.infer<typeof SectionSchema>>
-  languageCode: string
-  modelName: string
-  modelDomain: string
-}): Promise<string> {
-  const model = createModel(params.modelDomain, params.modelName)
-
-  // Find which section this page belongs to
-  const currentSection = params.sections.find(section => 
-    params.pageNumber >= section.fromPage && params.pageNumber <= section.toPage
-  )
-  
-  if (!currentSection) {
-    throw new Error(`No section found for page ${params.pageNumber}`)
-  }
-
-  // Calculate position within the section
-  const sectionProgress = (params.pageNumber - currentSection.fromPage) / (currentSection.toPage - currentSection.fromPage)
-  const isFirstPageOfSection = params.pageNumber === currentSection.fromPage
-  const isLastPageOfSection = params.pageNumber === currentSection.toPage
-  
-  const systemPrompt = `You are writing page ${params.pageNumber} of ${params.totalPages} for the book "${params.bookTitle}" by ${params.authorName}.
-
-AUTHOR STYLE: ${params.authorStyle}
-
-CURRENT SECTION: ${currentSection.title}
-SECTION SUMMARY: ${currentSection.summary}
-SECTION PAGES: ${currentSection.fromPage}-${currentSection.toPage}
-POSITION IN SECTION: ${Math.round(sectionProgress * 100)}% through this section
-${isFirstPageOfSection ? 'THIS IS THE FIRST PAGE OF THIS SECTION' : ''}
-${isLastPageOfSection ? 'THIS IS THE LAST PAGE OF THIS SECTION' : ''}
-
-LANGUAGE: Write in language code "${params.languageCode}"
-
-REQUIREMENTS:
-- Write authentic content that matches the author's style and book type
-- Make this page feel like part of the larger section and book
-- Include proper paragraph breaks and formatting
-- Write approximately 250-400 words per page
-- Maintain consistency with the book's genre and tone
-- Do not include page numbers or headers in the content
-- If first page of section, consider introducing the section topic
-- If last page of section, consider concluding the section appropriately
-
-Write compelling, immersive content that draws readers into this fictional world.`
-
-  const result = await generateObject({
-    model,
-    system: systemPrompt,
-    prompt: `Write the content for page ${params.pageNumber}, which is ${Math.round(sectionProgress * 100)}% through the "${currentSection.title}" section.`,
-    schema: PageContentSchema,
-    temperature: 0.7,
-  })
-
-  return result.object.content
-}
-
-/**
  * Validate that book sections have proper page coverage
  */
 export function validateBookSections(sections: Array<z.infer<typeof SectionSchema>>, totalPages: number): boolean {
   // Sort sections by fromPage
   const sortedSections = [...sections].sort((a, b) => a.fromPage - b.fromPage)
-  
+
   // Check if first section starts at page 1
   if (sortedSections[0]?.fromPage !== 1) {
     return false
   }
-  
+
   // Check if last section ends at totalPages
   if (sortedSections[sortedSections.length - 1]?.toPage !== totalPages) {
     return false
   }
-  
+
   // Check for gaps or overlaps
   for (let i = 0; i < sortedSections.length - 1; i++) {
     const current = sortedSections[i]
     const next = sortedSections[i + 1]
-    
+
     // Check for valid page ranges
     if (current.fromPage > current.toPage) {
       return false
     }
-    
+
     // Check for gaps or overlaps
     if (current.toPage + 1 !== next.fromPage) {
       return false
     }
   }
-  
+
   return true
 }
-
-/**
- * Get available models for a domain
- */
-export function getModelsForDomain(domain: string): string[] {
-  switch (domain) {
-    case 'openai':
-      return ['gpt-4o', 'gpt-4']
-    case 'anthropic':
-      return ['claude-3-5-sonnet', 'claude-3-haiku']
-    case 'google':
-      return ['gemini-1.5-pro', 'gemini-1.5-flash']
-    default:
-      return []
-  }
-}
-
-/**
- * Get API key for a model domain from user's BYO keys or environment
- */
-export function getApiKeyForDomain(domain: string, userApiKey?: string): string | undefined {
-  if (userApiKey) {
-    return userApiKey
-  }
-
-  switch (domain) {
-    case 'openai':
-      return process.env.OPENAI_API_KEY
-    case 'anthropic':
-      return process.env.ANTHROPIC_API_KEY
-    case 'google':
-      return process.env.GOOGLE_AI_API_KEY
-    default:
-      return undefined
-  }
-} 

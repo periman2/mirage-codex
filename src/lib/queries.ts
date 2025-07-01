@@ -39,6 +39,10 @@ export const queryKeys = {
     lists: () => [...queryKeys.searches.all, 'list'] as const,
     list: (filters: any) => [...queryKeys.searches.lists(), filters] as const,
   },
+  pages: {
+    all: ['pages'] as const,
+    adjacent: (editionId: string, currentPage: number) => [...queryKeys.pages.all, 'adjacent', editionId, currentPage] as const,
+  },
 }
 
 // Languages
@@ -96,6 +100,8 @@ export function useModels() {
           context_len,
           prompt_cost,
           completion_cost,
+          search_credits,
+          page_generation_credits,
           is_active,
           model_domains (
             label
@@ -585,5 +591,50 @@ export function useRandomBook() {
     enabled: false, // Only fetch when explicitly triggered
     staleTime: 0, // Always fresh random results
     gcTime: 0, // Don't cache random results
+  })
+}
+
+// Adjacent pages (previous and next) to check if they're already generated
+export function useAdjacentPages(editionId: string | null, currentPage: number, totalPages: number) {
+  const supabase = createSupabaseBrowserClient()
+  
+  return useQuery({
+    queryKey: queryKeys.pages.adjacent(editionId || '', currentPage),
+    queryFn: async () => {
+      if (!editionId) return { prevPage: null, nextPage: null }
+      
+      const pagesToCheck = []
+      
+      // Check previous page if not on first page
+      if (currentPage > 1) {
+        pagesToCheck.push(currentPage - 1)
+      }
+      
+      // Check next page if not on last page
+      if (currentPage < totalPages) {
+        pagesToCheck.push(currentPage + 1)
+      }
+      
+      if (pagesToCheck.length === 0) {
+        return { prevPage: null, nextPage: null }
+      }
+      console.log('pagesToCheck: ', pagesToCheck)
+      const { data, error } = await supabase
+        .from('book_pages')
+        .select('id, page_number')
+        .eq('edition_id', editionId)
+        .in('page_number', pagesToCheck)
+
+      console.log('book_pages data: ', data)
+      
+      if (error) throw error
+      
+      const prevPage = data?.find(p => p.page_number === currentPage - 1) || null
+      const nextPage = data?.find(p => p.page_number === currentPage + 1) || null
+      
+      return { prevPage, nextPage }
+    },
+    enabled: !!editionId && totalPages > 0,
+    staleTime: 0,
   })
 } 

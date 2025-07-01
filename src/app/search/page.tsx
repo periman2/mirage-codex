@@ -5,6 +5,9 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/lib/auth-context'
 import { useLanguages, useGenres, useTagsByGenre, useModels } from '@/lib/queries'
 import { useMutation } from '@tanstack/react-query'
+import { useCredits } from '@/hooks/useCredits'
+import { Coins } from 'iconoir-react'
+import type { Tables } from '@/lib/database.types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -12,6 +15,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import { BookSearchResultCard } from '@/components/book-search-result-card'
+import { AuthButton } from '@/components/auth-button'
 import { Search, Sparks, Book, ArrowLeft, ArrowRight, Filter, WarningTriangle, Refresh } from 'iconoir-react'
 import { toast } from 'sonner'
 
@@ -51,12 +55,26 @@ interface SearchRequest {
   pageNumber: number
 }
 
+// Model type as returned by useModels()
+type ModelWithCredits = {
+  id: number
+  name: string
+  domain_code: string
+  context_len: number
+  prompt_cost: number
+  completion_cost: number
+  search_credits: number | null
+  page_generation_credits: number | null
+  is_active: boolean | null
+  model_domains: { label: string } | null
+}
+
 // Type for tracking the current paginated search parameters
 interface PaginatedSearchState {
   freeText: string
   genreSlug: string // Keep as string, use empty string for no genre
   tagSlugs: string[]
-  modelId: number
+  model: ModelWithCredits
 }
 
 function SearchPageContent() {
@@ -71,7 +89,10 @@ function SearchPageContent() {
   const [selectedLanguage, setSelectedLanguage] = useState('auto')
   const [selectedGenre, setSelectedGenre] = useState('auto')
   const [selectedTags, setSelectedTags] = useState<string[]>([])
-  const [selectedModel, setSelectedModel] = useState<number | null>(null)
+  const [selectedModel, setSelectedModel] = useState<ModelWithCredits | null>(null)
+  
+  // Credits hook for invalidation
+  const { invalidateCredits } = useCredits()
   const [currentPage, setCurrentPage] = useState(1)
   const [isMobileFiltersOpen, setIsMobileFiltersOpen] = useState(false)
   const [isInitialLoad, setIsInitialLoad] = useState(true)
@@ -81,7 +102,7 @@ function SearchPageContent() {
 
   // Set default model to gemini-2.5-flash-lite when models are loaded
   const defaultModel = useMemo(() => {
-    return models?.find(m => m.name.toLowerCase().includes('lite'))?.id || null
+    return models?.find(m => m.name.toLowerCase().includes('lite')) || null
   }, [models])
 
   // Set default model when it becomes available
@@ -132,7 +153,7 @@ function SearchPageContent() {
           languageCode: urlLanguage || undefined, // Don't send language if not in URL
           genreSlug: urlGenre || undefined, // Allow undefined genre
           tagSlugs: urlTags,
-          modelId: modelToUse,
+          modelId: modelToUse.id,
           pageNumber: urlPage,
         })
       }
@@ -199,7 +220,7 @@ function SearchPageContent() {
       searchQuery.trim() !== paginatedSearchState.freeText ||
       selectedGenre !== paginatedSearchState.genreSlug ||
       JSON.stringify([...selectedTags].sort()) !== JSON.stringify([...paginatedSearchState.tagSlugs].sort()) ||
-      selectedModel !== paginatedSearchState.modelId
+      selectedModel?.id !== paginatedSearchState.model?.id
     )
   }, [searchQuery, selectedGenre, selectedTags, selectedModel, paginatedSearchState, currentPage])
 
@@ -210,7 +231,7 @@ function SearchPageContent() {
     setSearchQuery(paginatedSearchState.freeText)
     setSelectedGenre(paginatedSearchState.genreSlug)
     setSelectedTags([...paginatedSearchState.tagSlugs])
-    setSelectedModel(paginatedSearchState.modelId)
+    setSelectedModel(paginatedSearchState.model)
   }
 
   // Reset selected tags when genre changes
@@ -240,7 +261,7 @@ function SearchPageContent() {
         languageCode: selectedLanguage === 'auto' ? undefined : selectedLanguage || undefined, // Convert "auto" to undefined
         genreSlug: paginatedSearchState.genreSlug || undefined,
         tagSlugs: paginatedSearchState.tagSlugs,
-        modelId: paginatedSearchState.modelId,
+        modelId: paginatedSearchState.model.id,
         pageNumber: newPage,
       })
     }
@@ -278,12 +299,14 @@ function SearchPageContent() {
         freeText: variables.freeText || '',
         genreSlug: variables.genreSlug || 'auto', // Use "auto" for consistency with UI state
         tagSlugs: [...variables.tagSlugs],
-        modelId: variables.modelId
+        model: selectedModel!
       })
 
       if (data.cached) {
         toast.success(`Found cached results for page ${variables.pageNumber} - no credits used!`)
       } else {
+        // Invalidate credits cache since credits were consumed
+        invalidateCredits()
         toast.success(`Searched for ${data.books.length} new books for page ${variables.pageNumber}!`)
       }
     },
@@ -322,7 +345,7 @@ function SearchPageContent() {
       languageCode: selectedLanguage === 'auto' ? undefined : selectedLanguage || undefined, // Convert "auto" to undefined
       genreSlug: selectedGenre === 'auto' ? undefined : selectedGenre || undefined, // Convert "auto" to undefined
       tagSlugs: selectedTags,
-      modelId: selectedModel,
+      modelId: selectedModel?.id || 0,
       pageNumber: 1, // Always start from page 1 for new searches
     })
   }
@@ -345,12 +368,12 @@ function SearchPageContent() {
             <p className="text-mirage-text-tertiary mb-6">
               Please sign in to access the Search feature.
             </p>
-            <Button
-              onClick={() => window.location.href = '/'}
+            <AuthButton
+              onSignInSuccess={() => window.location.reload()}
               className="bg-mirage-accent-primary hover:bg-mirage-accent-hover text-white"
             >
-              Go Home
-            </Button>
+              Sign In
+            </AuthButton>
           </div>
         </div>
       </div>
@@ -361,7 +384,7 @@ function SearchPageContent() {
     <div 
       className="flex h-[calc(100vh-4rem)] relative bg-mirage-gradient p-4 gap-4"
       style={{
-        backgroundImage: `url('/marble_texture.png')`,
+        backgroundImage: `url('https://nxdsudkpprqhmvesftzp.supabase.co/storage/v1/object/public/app/background/marble_texture.jpg')`,
         backgroundSize: 'cover',
         backgroundPosition: 'center',
         backgroundRepeat: 'no-repeat',
@@ -372,7 +395,7 @@ function SearchPageContent() {
       <div 
         className="absolute inset-0 pointer-events-none"
         style={{
-          backgroundImage: `url('/marble_texture.png')`,
+          backgroundImage: `url('https://nxdsudkpprqhmvesftzp.supabase.co/storage/v1/object/public/app/background/marble_texture.jpg')`,
           backgroundSize: 'cover',
           backgroundPosition: 'center',
           backgroundRepeat: 'no-repeat',
@@ -499,8 +522,11 @@ function SearchPageContent() {
               <div className="space-y-2">
                 <Label className="text-sm font-medium text-mirage-text-secondary">AI Model</Label>
                 <Select
-                  value={selectedModel?.toString() || ''}
-                  onValueChange={(value) => setSelectedModel(parseInt(value))}
+                  value={selectedModel?.id.toString() || ''}
+                  onValueChange={(value) => {
+                    const model = models?.find(m => m.id === parseInt(value))
+                    setSelectedModel(model || null)
+                  }}
                 >
                   <SelectTrigger className="h-9 text-sm bg-white/90 border-mirage-border-primary !w-full min-w-0">
                     <SelectValue placeholder="Select a model" />
@@ -567,7 +593,14 @@ function SearchPageContent() {
               ) : (
                 <>
                   <Search className="h-4 w-4 mr-2" style={{ color: 'white' }} />
-                  <span style={{ color: 'white' }}>Search Books</span>
+                  <span style={{ color: 'white' }}>
+                    Search Books
+                    {selectedModel?.search_credits && (
+                      <span className="ml-1">
+                        (<Coins className="h-3 w-3 inline mx-1" />{selectedModel.search_credits})
+                      </span>
+                    )}
+                  </span>
                 </>
               )}
             </Button>
@@ -606,6 +639,7 @@ function SearchPageContent() {
                   borderColor: 'rgb(217 119 6)',
                   color: 'white'
                 }}
+                title={selectedModel?.search_credits ? `Search (${selectedModel.search_credits} credits)` : 'Search'}
               >
                 {searchMutation.isPending ? (
                   <Sparks className="h-4 w-4 animate-spin" style={{ color: 'white' }} />

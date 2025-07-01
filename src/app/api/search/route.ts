@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient, createSupabaseAdminClient } from '@/lib/supabase'
 import { createSearchHash, validateSearchParams } from '@/lib/hash'
 import { generateBooks, generateAuthors, determineGenreAndLanguage, PAGE_SIZE, AuthorSchema } from '@/lib/ai'
+import { getSearchCreditCost } from '@/lib/credit-constants'
 import { z } from 'zod'
 import { SupabaseClient } from '@supabase/supabase-js'
 import { Database, Tables } from '@/lib/database.types'
@@ -358,17 +359,7 @@ export async function POST(request: NextRequest) {
     const tagPrompts = tags?.map(t => t.prompt_boost).filter((prompt): prompt is string => Boolean(prompt)) || []
     console.log('🏷️ Tag prompts:', tagPrompts)
 
-    // Check user credits (if not using BYO key)
-    console.log('💳 Checking user billing...')
-    const { data: userBilling } = await supabase
-      .from('user_billing')
-      .select('credits')
-      .eq('user_id', user.id)
-      .single()
-
-    console.log('💳 User billing:', userBilling)
-
-    // Check for BYO API key
+    // Check for BYO API key first 
     console.log('🔑 Checking for user API key...')
     const { data: userApiKey } = await supabase
       .from('user_api_keys')
@@ -378,18 +369,46 @@ export async function POST(request: NextRequest) {
       .single()
 
     console.log('🔑 User API key found:', !!userApiKey)
-
     const hasApiKey = !!userApiKey
-    const hasCredits = (userBilling?.credits || 0) >= 10 // Assume ~10 credits needed
 
-    console.log('💰 Credit check - hasApiKey:', hasApiKey, 'hasCredits:', hasCredits, 'credits:', userBilling?.credits)
+    // Get model-specific credit cost (calculate once and reuse)
+    let searchCreditCost: number | null = null
+    if (!hasApiKey) {
+      searchCreditCost = await getSearchCreditCost(finalSearchParams.modelId)
+      console.log(`💰 Search will cost ${searchCreditCost} credits for model ${finalSearchParams.modelId}`)
+    }
 
-    if (!hasApiKey && !hasCredits) {
-      console.log('❌ Insufficient credits and no API key')
-      return NextResponse.json(
-        { error: 'Insufficient credits and no API key configured' },
-        { status: 402 }
-      )
+    // Check user credits if not using BYO key
+    if (!hasApiKey && searchCreditCost) {
+      console.log('💳 Checking user credits...')
+      
+      const { data: hasEnoughCredits, error: creditCheckError } = await supabase
+        .rpc('check_user_credits', { 
+          p_user_id: user.id, 
+          p_credits_needed: searchCreditCost 
+        })
+
+      if (creditCheckError) {
+        console.error('❌ Error checking credits:', creditCheckError)
+        return NextResponse.json(
+          { error: 'Failed to check user credits' },
+          { status: 500 }
+        )
+      }
+
+      console.log('💰 Credit check result:', hasEnoughCredits, 'needed:', searchCreditCost)
+
+      if (!hasEnoughCredits) {
+        console.log('❌ Insufficient credits')
+        return NextResponse.json(
+          { 
+            error: 'Insufficient credits for search',
+            creditsNeeded: searchCreditCost,
+            message: `You need ${searchCreditCost} credits to perform a search. Please upgrade your plan or add more credits.`
+          },
+          { status: 402 }
+        )
+      }
     }
 
     // NEW AUTHOR SELECTION/GENERATION LOGIC
@@ -482,7 +501,8 @@ export async function POST(request: NextRequest) {
     })
 
     // Save results using Supabase function (atomic transaction) with original hash
-    console.log('💾 Saving search results to database...')
+    // Credit deduction now happens inside the save_search_results function
+    console.log('💾 Saving search results to database with credit deduction...')
     console.log('💾 Save params:', {
       hash: searchHash, // Use original hash from user input
       userId: user.id,
@@ -493,7 +513,9 @@ export async function POST(request: NextRequest) {
       modelId: finalSearchParams.modelId,
       pageNumber: finalSearchParams.pageNumber,
       pageSize: finalSearchParams.pageSize,
-      booksCount: booksWithAuthorIds.length
+      booksCount: booksWithAuthorIds.length,
+      shouldDeductCredits: !hasApiKey,
+      creditCost: searchCreditCost || 0
     })
     
     const { data: saveResult } = await supabase
@@ -508,6 +530,9 @@ export async function POST(request: NextRequest) {
         p_page_number: finalSearchParams.pageNumber,
         p_page_size: finalSearchParams.pageSize,
         p_books: booksWithAuthorIds,
+        p_should_deduct_credits: !hasApiKey,
+        p_credit_cost: searchCreditCost || 0,
+        p_search_description: `Search for "${finalSearchParams.freeText || 'books'}" in ${finalGenreSlug}`
       })
 
     console.log('💾 Save result:', saveResult)
@@ -522,25 +547,16 @@ export async function POST(request: NextRequest) {
 
     console.log('✅ Search results saved successfully')
 
-    // Calculate total pages for credit deduction
-    const totalPages = generatedBooks.books.reduce((sum, book) => sum + book.pageCount, 0)
-    console.log('📊 Total pages generated:', totalPages)
-
-    // Deduct credits if not using BYO key
-    if (!hasApiKey && hasCredits) {
-      const creditsToDeduct = Math.ceil(totalPages / 10)
-      console.log('💳 Deducting credits:', creditsToDeduct, 'from', userBilling?.credits)
-      
-      await supabase
-        .from('user_billing')
-        .update({ 
-          credits: (userBilling?.credits || 0) - creditsToDeduct // 1 credit per ~10 pages //TODO: improve this
-        })
-        .eq('user_id', user.id)
-      
-      console.log('✅ Credits deducted successfully')
+    // Log credit deduction result
+    if (!hasApiKey && searchCreditCost) {
+      const creditDeductionSuccess = (saveResult as any)?.credit_deduction_success
+      if (creditDeductionSuccess) {
+        console.log('✅ Credits deducted successfully during save')
+      } else {
+        console.log('⚠️ Search saved but credit deduction failed or returned false')
+      }
     } else {
-      console.log('⏭️ Skipping credit deduction (using API key or no credits)')
+      console.log('⏭️ Credit deduction skipped (user has API key)')
     }
 
     // Retrieve the saved results to get proper IDs

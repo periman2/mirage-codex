@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient, createSupabaseAdminClient } from '@/lib/supabase'
+import { getPageGenerationCreditCost } from '@/lib/credit-constants'
 
 interface RouteParams {
   params: Promise<{
@@ -29,6 +30,36 @@ export async function POST(
       )
     }
 
+    // Get edition details to determine model and check for user API key
+    const { data: editionDetails, error: editionError } = await supabase
+      .from('editions')
+      .select(`
+        model_id,
+        books (title),
+        models (domain_code)
+      `)
+      .eq('id', editionId)
+      .single()
+
+    if (editionError || !editionDetails) {
+      console.error('❌ Edition not found:', editionError)
+      return NextResponse.json(
+        { error: 'Edition not found' },
+        { status: 404 }
+      )
+    }
+
+    // Check for BYO API key
+    const { data: userApiKey } = await supabase
+      .from('user_api_keys')
+      .select('api_key_enc')
+      .eq('user_id', user.id)
+      .eq('domain_code', editionDetails.models.domain_code)
+      .single()
+
+    const hasApiKey = !!userApiKey
+    console.log('🔑 User has API key:', hasApiKey)
+
     // Save the page content using admin client (required for RLS)
     const adminSupabase = createSupabaseAdminClient()
     const { error } = await adminSupabase
@@ -48,6 +79,35 @@ export async function POST(
     }
 
     console.log('✅ Page saved successfully')
+
+    // Deduct credits only if page was saved successfully and user doesn't have BYO API key
+    if (!hasApiKey) {
+      const pageGenerationCreditCost = await getPageGenerationCreditCost(editionDetails.model_id)
+      console.log(`💳 Deducting ${pageGenerationCreditCost} credits for saved page`)
+      
+      const { data: deductionSuccess, error: deductionError } = await supabase
+        .rpc('deduct_user_credits', {
+          p_user_id: user.id,
+          p_credits_to_deduct: pageGenerationCreditCost,
+          p_transaction_type: 'page_generation',
+          p_description: `Generated page ${pageNumber} for "${editionDetails.books.title}"`
+        })
+      
+      console.log('💳 Credit deduction result:', { deductionSuccess, deductionError })
+      
+      if (deductionError) {
+        console.error('❌ Error deducting credits:', deductionError)
+        // Don't fail the save since page is already saved - just log the issue
+        console.log('⚠️ Page saved but credit deduction failed')
+      } else if (!deductionSuccess) {
+        console.log('⚠️ Page saved but credit deduction returned false')
+      } else {
+        console.log('✅ Credits deducted successfully after page save')
+      }
+    } else {
+      console.log('⏭️ Skipping credit deduction (user has API key)')
+    }
+
     return NextResponse.json({ success: true })
 
   } catch (error) {

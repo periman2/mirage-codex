@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { Avatar } from './ui/avatar'
 import { Button } from './ui/button'
 import { 
@@ -17,6 +18,7 @@ import { User, Settings, LogOut, CreditCard } from 'iconoir-react'
 export function UserMenu() {
   const { user, profile, signOut } = useAuth()
   const [isProfileOpen, setIsProfileOpen] = useState(false)
+  const router = useRouter()
 
   if (!user) return null
 
@@ -79,8 +81,8 @@ export function UserMenu() {
               variant="ghost" 
               className="w-full justify-start"
               onClick={() => {
-                // TODO: Open profile settings
                 setIsProfileOpen(false)
+                router.push('/profile')
               }}
             >
               <User className="mr-2 h-4 w-4" />
@@ -91,8 +93,8 @@ export function UserMenu() {
               variant="ghost" 
               className="w-full justify-start"
               onClick={() => {
-                // TODO: Open billing
                 setIsProfileOpen(false)
+                router.push('/billing')
               }}
             >
               <CreditCard className="mr-2 h-4 w-4" />
@@ -103,8 +105,8 @@ export function UserMenu() {
               variant="ghost" 
               className="w-full justify-start"
               onClick={() => {
-                // TODO: Open settings
                 setIsProfileOpen(false)
+                // TODO: Add settings page
               }}
             >
               <Settings className="mr-2 h-4 w-4" />

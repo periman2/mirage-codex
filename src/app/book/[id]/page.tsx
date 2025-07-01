@@ -8,11 +8,15 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { ChevronLeft, ChevronRight, Bookmark, Share2, Eye, Heart, Type } from 'lucide-react'
+import { Coins, Spark } from 'iconoir-react'
 import { toast } from 'sonner'
 import Markdown from 'react-markdown'
 import { useBookStats, useBookLike, useBookView, usePageStats, usePageLike, usePageView, usePageContent } from '@/hooks/useBookStats'
 import { useBookData, type BookData, type BookEdition } from '@/hooks/useBookData'
 import { useBookmarks } from '@/hooks/useBookmarks'
+import { usePageGenerationCreditCost } from '@/hooks/useCreditCosts'
+import { useCredits } from '@/hooks/useCredits'
+import { useAdjacentPages } from '@/lib/queries'
 import { BookInfoSidebar } from '@/components/book-info-sidebar'
 import { BookmarkDialogs } from '@/components/bookmark-dialogs'
 
@@ -31,16 +35,28 @@ export default function BookDetailPage() {
   // Determine current edition from URL params or default to first edition
   const currentEdition = book?.editions.find(ed => ed.id === editionId) || book?.editions[0]
 
+  // Get credit cost for page generation
+  const { data: pageGenerationCreditCost } = usePageGenerationCreditCost(currentEdition?.modelId || null)
+  
+  // Credits hook for invalidation
+  const { invalidateCredits } = useCredits()
+
   const [currentPage, setCurrentPage] = useState(() => {
     const pageParam = searchParams?.get('page')
     return pageParam ? parseInt(pageParam) : 1
   })
+  
+  // Get adjacent pages to check if they're already generated
+  const { data: adjacentPages, isLoading: isAdjacentPagesLoading } = useAdjacentPages(
+    currentEdition?.id || null,
+    currentPage,
+    book?.pageCount || 0
+  )
   const [pageContent, setPageContent] = useState<string>('')
   const [isGenerating, setIsGenerating] = useState(false)
   const [isPageCached, setIsPageCached] = useState(false) // Track if page content is cached/saved
   const [isMobileBookInfoOpen, setIsMobileBookInfoOpen] = useState(false)
   const [fontSize, setFontSize] = useState<'small' | 'medium' | 'large' | 'xl'>('medium')
-
 
   // Optimistic UI state
   const [optimisticBookLike, setOptimisticBookLike] = useState<{ liked: boolean; count: number } | null>(null)
@@ -48,6 +64,56 @@ export default function BookDetailPage() {
 
   // Ref to prevent duplicate generation requests
   const generationInProgress = useRef(false)
+
+  // Check if a specific page will require generation (not cached)
+  const willPageRequireGeneration = (pageNumber: number) => {
+    if (!user) return false // Can't generate without authentication
+
+    if(pageNumber <= 0) return false;
+    if(book?.pageCount && pageNumber > book?.pageCount) return false;
+    
+    // For current page, use our local cache status
+    if (pageNumber === currentPage) {
+      return !isPageCached
+    }
+    
+    // For adjacent pages, use the data from adjacentPages hook
+    if (pageNumber === currentPage - 1) {
+      return !adjacentPages?.prevPage // Will need generation if page doesn't exist
+    }
+    
+    if (pageNumber === currentPage + 1) {
+      return !adjacentPages?.nextPage // Will need generation if page doesn't exist
+    }
+    
+    // For other pages, we don't have data so assume they might need generation
+    return true
+  }
+
+  // Helper function to render credit cost indicator with loading state
+  const renderCreditCost = (pageNumber: number, isSmall: boolean = false) => {
+    if (!user) return null
+    
+    // Check if we're still loading adjacent pages data
+    if (isAdjacentPagesLoading && (pageNumber === currentPage - 1 || pageNumber === currentPage + 1)) {
+      return (
+        <span className="ml-1">
+          (<div className={`animate-spin rounded-full border-b-2 border-current inline-block ${isSmall ? 'h-2 w-2' : 'h-3 w-3'}`}></div>)
+        </span>
+      )
+    }
+    
+    // Show credit cost if page will require generation
+    if (willPageRequireGeneration(pageNumber) && pageGenerationCreditCost) {
+      return (
+        <span className="ml-1">
+          (<Spark className={`inline ${isSmall ? 'h-2 w-2 mx-0.5' : 'h-3 w-3 mx-1'}`} />{pageGenerationCreditCost})
+        </span>
+      )
+    }
+    
+    return null
+  }
 
   // Font size utility function
   const getFontSizeClasses = (size: typeof fontSize) => {
@@ -84,9 +150,7 @@ export default function BookDetailPage() {
     
     return processedContent
   }
-
-
-
+  
   // Book-level stats hooks (only enabled when page content is cached/saved)
   const { data: bookStats, refetch: refetchBookStats } = useBookStats(bookId, isPageCached)
   const bookLikeMutation = useBookLike(bookId)
@@ -113,6 +177,10 @@ export default function BookDetailPage() {
           })
           setPageContent(message.content) // Store raw content with patterns
           setIsPageCached(true) // Mark as cached since we successfully saved to database
+          
+          // Invalidate credits cache since credits were consumed for page generation
+          invalidateCredits()
+          
           console.log('✅ Page content saved to database')
         } catch (error) {
           console.error('❌ Failed to save page content:', error)
@@ -193,7 +261,7 @@ export default function BookDetailPage() {
   })
 
   // Function to update URL with current page and edition
-  const updatePageURL = (pageNumber: number, newEditionId?: string) => {
+  const updatePageURL = (pageNumber: number, newEditionId?: string, createHistoryEntry: boolean = true) => {
     const params = new URLSearchParams()
     const editionToUse = newEditionId || currentEdition?.id
     if (editionToUse) {
@@ -204,7 +272,14 @@ export default function BookDetailPage() {
     }
 
     const newURL = `/book/${bookId}${params.toString() ? '?' + params.toString() : ''}`
-    router.push(newURL, { scroll: false })
+    
+    if (createHistoryEntry) {
+      // Create a new history entry for page navigation
+      router.push(newURL, { scroll: false })
+    } else {
+      // Replace current history entry (for initial loads)
+      router.replace(newURL, { scroll: false })
+    }
   }
 
   // Function to handle edition switching
@@ -213,8 +288,8 @@ export default function BookDetailPage() {
     setPageContent('')
     setIsPageCached(false)
 
-    // Update URL with new edition
-    updatePageURL(currentPage, newEditionId)
+    // Update URL with new edition (create history entry for edition changes)
+    updatePageURL(currentPage, newEditionId, true)
 
     toast.success('Switched to different edition')
   }
@@ -244,12 +319,12 @@ export default function BookDetailPage() {
     }
   }
 
-  // Update URL when book loads or page changes
+  // Update URL when book loads (but don't create history entries for initial sync)
   useEffect(() => {
     if (book && currentPage) {
-      updatePageURL(currentPage)
+      updatePageURL(currentPage, undefined, false) // Don't create history entry for initial sync
     }
-  }, [currentEdition?.id, currentPage])
+  }, [currentEdition?.id]) // Removed currentPage dependency to avoid creating entries on every page change
 
   // Track book view when page content is cached (book successfully loaded)
   useEffect(() => {
@@ -257,6 +332,18 @@ export default function BookDetailPage() {
       trackBookView()
     }
   }, [book?.id, isPageCached])
+
+  // Handle browser back/forward navigation
+  useEffect(() => {
+    const pageParam = searchParams?.get('page')
+    const urlPage = pageParam ? parseInt(pageParam) : 1
+    
+    // Update current page if URL changed (e.g., browser back/forward)
+    if (urlPage !== currentPage && urlPage > 0) {
+      console.log(`📖 Browser navigation: page ${currentPage} → ${urlPage}`)
+      setCurrentPage(urlPage)
+    }
+  }, [searchParams, currentPage])
 
   // Reset page state when changing pages
   useEffect(() => {
@@ -275,16 +362,18 @@ export default function BookDetailPage() {
   const nextPage = () => {
     if (book && currentPage < book.pageCount) {
       const newPage = currentPage + 1
+      console.log(`➡️ Navigating to next page: ${currentPage} → ${newPage}`)
       setCurrentPage(newPage)
-      // URL will be updated automatically by useEffect
+      updatePageURL(newPage, undefined, true) // Create history entry for navigation
     }
   }
 
   const prevPage = () => {
     if (currentPage > 1) {
       const newPage = currentPage - 1
+      console.log(`⬅️ Navigating to previous page: ${currentPage} → ${newPage}`)
       setCurrentPage(newPage)
-      // URL will be updated automatically by useEffect
+      updatePageURL(newPage, undefined, true) // Create history entry for navigation
     }
   }
 
@@ -616,24 +705,36 @@ export default function BookDetailPage() {
                   <div className="flex space-x-2 md:space-x-3">
                     <Button
                       onClick={prevPage}
-                      disabled={currentPage <= 1}
+                      disabled={currentPage <= 1 || isGenerating}
                       variant="outline"
                       size="sm"
                       className="h-8 px-2 md:h-10 md:px-4 text-xs md:text-sm bg-white/90 border-mirage-border-primary"
                     >
                       <ChevronLeft className="h-3 w-3 md:h-4 md:w-4 mr-1 md:mr-2" />
-                      <span className="hidden sm:inline">Previous</span>
-                      <span className="sm:hidden">Prev</span>
+                      <span className="hidden sm:inline">
+                        Previous
+                        {renderCreditCost(currentPage - 1, false)}
+                      </span>
+                      <span className="sm:hidden">
+                        Prev
+                        {renderCreditCost(currentPage - 1, true)}
+                      </span>
                     </Button>
                     <Button
                       onClick={nextPage}
-                      disabled={!book || currentPage >= book.pageCount}
+                      disabled={!book || currentPage >= book.pageCount || isGenerating}
                       variant="outline"
                       size="sm"
                       className="h-8 px-2 md:h-10 md:px-4 text-xs md:text-sm bg-white/90 border-mirage-border-primary"
                     >
-                      <span className="hidden sm:inline">Next</span>
-                      <span className="sm:hidden">Next</span>
+                      <span className="hidden sm:inline">
+                        Next
+                        {renderCreditCost(currentPage + 1, false)}
+                      </span>
+                      <span className="sm:hidden">
+                        Next
+                        {renderCreditCost(currentPage + 1, true)}
+                      </span>
                       <ChevronRight className="h-3 w-3 md:h-4 md:w-4 ml-1 md:ml-2" />
                     </Button>
                   </div>

@@ -1,23 +1,17 @@
 'use client'
 
-import { useState } from 'react'
-import { AuthDialog } from '@/components/auth-dialog'
+import { AuthButton, type AuthButtonRef } from '@/components/auth-button'
 import { useAuth } from '@/lib/auth-context'
 import { Book, Search, Lock } from 'iconoir-react'
 import { useRouter } from 'next/navigation'
 import Logo from '@/components/logo'
+import { useRef } from 'react'
 
 export default function HomePage() {
   const { user } = useAuth()
-  const [isAuthOpen, setIsAuthOpen] = useState(false)
   const router = useRouter()
 
   const handleModeSelect = (mode: 'browse' | 'search') => {
-    if (mode === 'search' && !user) {
-      setIsAuthOpen(true)
-      return
-    }
-
     if (mode === 'browse') {
       router.push('/browse')
     } else {
@@ -31,7 +25,7 @@ export default function HomePage() {
       <div 
         className="absolute inset-0 pointer-events-none"
         style={{
-          backgroundImage: 'url(/marble_texture.png)',
+          backgroundImage: 'url(https://nxdsudkpprqhmvesftzp.supabase.co/storage/v1/object/public/app/background/marble_texture.jpg)',
           backgroundSize: 'cover',
           backgroundPosition: 'center',
           backgroundRepeat: 'no-repeat',
@@ -121,12 +115,12 @@ export default function HomePage() {
             title="Browse"
             subtitle="Read what others have summoned"
             icon={<Book className="w-8 h-8 md:w-10 md:h-10" />}
-            description="Explore what others search. Memories of things to be."
+            description="Explore what others search."
             isPrimary={true}
             onClick={() => handleModeSelect('browse')}
           />
           
-          {/* Search Mode - Secondary with lock */}
+          {/* Search Mode - Secondary with lock or direct access */}
           <ModeCard
             mode="search"
             title="Search"
@@ -136,14 +130,12 @@ export default function HomePage() {
             requiresAuth={!user}
             isPrimary={false}
             onClick={() => handleModeSelect('search')}
+            onSignInSuccess={() => router.push('/search')}
           />
         </div>
       </div>
 
-      <AuthDialog
-        isOpen={isAuthOpen}
-        onClose={() => setIsAuthOpen(false)}
-      />
+
     </div>
   )
 }
@@ -157,40 +149,22 @@ interface ModeCardProps {
   requiresAuth?: boolean
   isPrimary?: boolean
   onClick: () => void
+  onSignInSuccess?: () => void
 }
 
-function ModeCard({ mode, title, subtitle, icon, description, requiresAuth, isPrimary, onClick }: ModeCardProps) {
-  return (
-    <button
-      onClick={onClick}
-      className={`
-        group relative overflow-hidden
-        ${isPrimary 
-          ? 'text-white' 
-          : 'bg-amber-50/5 dark:bg-transparent hover:bg-amber-50/8 dark:hover:bg-transparent text-slate-600 dark:text-amber-100'
-        }
-        backdrop-blur-sm
-        rounded-xl
-        border
-        p-4 md:p-6
-        text-center
-        transition-all duration-500 ease-out
-        hover:scale-102 hover:shadow-2xl 
-        hover:shadow-amber-900/8 dark:hover:shadow-amber-400/8
-        ${!isPrimary && 'hover:border-amber-800/80 dark:hover:border-amber-100/80'}
-        focus:outline-none focus-visible:ring-2
-        min-h-[140px] md:min-h-[160px]
-        flex flex-col items-center justify-center
-        ${isPrimary ? 'min-h-[160px] md:min-h-[180px]' : ''}
-      `}
-      style={{
-        backgroundColor: isPrimary ? 'rgb(217 119 6)' : undefined,
-        borderColor: isPrimary ? 'rgba(217, 119, 6, 0.6)' : 'rgba(217, 119, 6, 0.6)',
-        ...(isPrimary && {
-          ':hover': { backgroundColor: 'rgb(180 83 9)' }
-        })
-      }}
-    >
+function ModeCard({ mode, title, subtitle, icon, description, requiresAuth, isPrimary, onClick, onSignInSuccess }: ModeCardProps) {
+  const authButtonRef = useRef<AuthButtonRef>(null)
+
+  const handleCardClick = () => {
+    if (requiresAuth) {
+      authButtonRef.current?.openAuth()
+    } else {
+      onClick()
+    }
+  }
+
+  const cardContent = (
+    <>
       {/* Radial glow effect on hover */}
       <div 
         className="absolute inset-0 opacity-0 group-hover:opacity-10 transition-opacity duration-500 ease-out rounded-xl"
@@ -259,10 +233,48 @@ function ModeCard({ mode, title, subtitle, icon, description, requiresAuth, isPr
         </p>
       </div>
 
+      {/* Invisible Auth Button for search mode when not authenticated */}
+      {requiresAuth && mode === 'search' && (
+        <AuthButton
+          ref={authButtonRef}
+          onSignInSuccess={onSignInSuccess}
+          invisible={true}
+        />
+      )}
+
       {/* Subtle gradient overlay on hover for non-primary */}
       {!isPrimary && (
         <div className="absolute inset-0 opacity-0 group-hover:opacity-3 transition-opacity duration-500 ease-out bg-gradient-to-br from-amber-400 to-amber-600 rounded-xl" />
       )}
+    </>
+  )
+
+  return (
+    <button
+      onClick={handleCardClick}
+      className={`
+        group relative overflow-hidden
+        ${isPrimary 
+          ? 'text-white' 
+          : 'bg-amber-50/5 dark:bg-transparent hover:bg-amber-50/8 dark:hover:bg-transparent text-slate-600 dark:text-amber-100'
+        }
+        backdrop-blur-sm
+        rounded-xl
+        border
+        p-4 md:p-6
+        text-center
+        transition-all duration-500 ease-out
+        hover:scale-102 hover:shadow-2xl 
+        hover:shadow-amber-900/8 dark:hover:shadow-amber-400/8
+        ${!isPrimary && 'hover:border-amber-800/80 dark:hover:border-amber-100/80'}
+        w-full h-44 md:h-48 min-h-[11rem]
+      `}
+      style={{
+        backgroundColor: isPrimary ? 'rgb(217 119 6)' : undefined,
+        borderColor: isPrimary ? 'rgb(217 119 6)' : 'rgba(217, 119, 6, 0.3)',
+      }}
+    >
+      {cardContent}
     </button>
   )
 }

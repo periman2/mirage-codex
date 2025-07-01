@@ -3,14 +3,14 @@
 import { useState, useEffect } from 'react'
 import { Button } from './ui/button'
 import { useAuth } from '@/lib/auth-context'
-import { AuthDialog } from './auth-dialog'
+import { AuthButton } from './auth-button'
 import { UserMenu } from './user-menu'
+import { CreditsDisplay } from './credits-display'
 
 import { Menu, Xmark } from 'iconoir-react'
 
 export function Navbar() {
   const { user, loading } = useAuth()
-  const [isAuthOpen, setIsAuthOpen] = useState(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [isScrolled, setIsScrolled] = useState(false)
 
@@ -25,12 +25,8 @@ export function Navbar() {
   }, [])
 
   const handleSearchClick = () => {
-    if (!user) {
-      setIsAuthOpen(true)
-    } else {
-      // Navigate to search page
-      window.location.href = '/search'
-    }
+    // Navigate to search page
+    window.location.href = '/search'
   }
 
   return (
@@ -56,7 +52,7 @@ export function Navbar() {
                   className="absolute top-1/2 left-0 transform -translate-y-1/2 w-20 h-20 flex items-center justify-center hover:opacity-80 transition-opacity z-10"
                 >
                   <img 
-                    src="/logo.svg" 
+                    src="https://nxdsudkpprqhmvesftzp.supabase.co/storage/v1/object/public/app/logo/logo.svg" 
                     alt="MirageCodex Logo" 
                     className="w-20 h-20 object-contain filter brightness-0 dark:brightness-0 dark:invert drop-shadow-sm"
                   />
@@ -78,15 +74,24 @@ export function Navbar() {
               >
                 Search {!user && '(Login Required)'}
               </button>
+
+              {/* Credits display for authenticated users */}
+              {user && (
+                <CreditsDisplay 
+                  variant="navbar" 
+                  size="sm" 
+                  onClick={() => window.location.href = '/billing'}
+                />
+              )}
               
               {loading ? (
                 <div className="w-8 h-8 rounded-full bg-amber-200 dark:bg-amber-800 animate-pulse" />
               ) : user ? (
                 <UserMenu />
               ) : (
-                <Button onClick={() => setIsAuthOpen(true)} size="sm" className="bg-amber-600 hover:bg-amber-700 text-white">
+                <AuthButton size="sm" className="bg-amber-600 hover:bg-amber-700 text-white">
                   Sign In
-                </Button>
+                </AuthButton>
               )}
             </nav>
 
@@ -120,6 +125,20 @@ export function Navbar() {
               >
                 Search {!user && '(Login Required)'}
               </button>
+
+              {/* Credits display for authenticated users - mobile */}
+              {user && (
+                <div className="px-2 py-1">
+                  <CreditsDisplay 
+                    variant="pill" 
+                    size="sm" 
+                    onClick={() => {
+                      window.location.href = '/billing'
+                      setIsMobileMenuOpen(false)
+                    }}
+                  />
+                </div>
+              )}
               
               {loading ? (
                 <div className="px-2 py-1">
@@ -131,16 +150,14 @@ export function Navbar() {
                 </div>
               ) : (
                 <div className="px-2 py-1">
-                  <Button 
-                    onClick={() => {
-                      setIsAuthOpen(true)
-                      setIsMobileMenuOpen(false)
-                    }} 
+                  <AuthButton 
+                    onSignInSuccess={() => setIsMobileMenuOpen(false)}
                     size="sm"
                     className="w-full bg-amber-600 hover:bg-amber-700 text-white"
+                    fullWidth
                   >
                     Sign In
-                  </Button>
+                  </AuthButton>
                 </div>
               )}
             </nav>
@@ -148,10 +165,7 @@ export function Navbar() {
         </div>
       </header>
 
-      <AuthDialog 
-        isOpen={isAuthOpen} 
-        onClose={() => setIsAuthOpen(false)} 
-      />
+
     </>
   )
 } 

@@ -378,6 +378,36 @@ export type Database = {
           },
         ]
       }
+      credit_transactions: {
+        Row: {
+          amount: number
+          created_at: string | null
+          description: string | null
+          id: number
+          metadata: Json | null
+          transaction_type: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string | null
+          description?: string | null
+          id?: number
+          metadata?: Json | null
+          transaction_type: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string | null
+          description?: string | null
+          id?: number
+          metadata?: Json | null
+          transaction_type?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       editions: {
         Row: {
           book_id: string
@@ -541,7 +571,9 @@ export type Database = {
           id: number
           is_active: boolean | null
           name: string
+          page_generation_credits: number | null
           prompt_cost: number
+          search_credits: number | null
         }
         Insert: {
           completion_cost: number
@@ -551,7 +583,9 @@ export type Database = {
           id?: number
           is_active?: boolean | null
           name: string
+          page_generation_credits?: number | null
           prompt_cost: number
+          search_credits?: number | null
         }
         Update: {
           completion_cost?: number
@@ -561,7 +595,9 @@ export type Database = {
           id?: number
           is_active?: boolean | null
           name?: string
+          page_generation_credits?: number | null
           prompt_cost?: number
+          search_credits?: number | null
         }
         Relationships: [
           {
@@ -813,6 +849,42 @@ export type Database = {
           },
         ]
       }
+      subscription_plans: {
+        Row: {
+          created_at: string | null
+          credits_per_month: number
+          description: string | null
+          id: number
+          is_active: boolean | null
+          name: string
+          price_cents: number
+          slug: string
+          stripe_price_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          credits_per_month?: number
+          description?: string | null
+          id?: number
+          is_active?: boolean | null
+          name: string
+          price_cents?: number
+          slug: string
+          stripe_price_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          credits_per_month?: number
+          description?: string | null
+          id?: number
+          is_active?: boolean | null
+          name?: string
+          price_cents?: number
+          slug?: string
+          stripe_price_id?: string | null
+        }
+        Relationships: []
+      }
       tag_categories: {
         Row: {
           created_at: string | null
@@ -908,31 +980,73 @@ export type Database = {
         Row: {
           created_at: string | null
           credits: number | null
+          credits_reset_at: string | null
+          credits_used_this_month: number | null
           last_event: Json | null
+          plan_ends_at: string | null
+          plan_id: number | null
+          plan_starts_at: string | null
+          stripe_customer_id: string | null
+          stripe_subscription_id: string | null
           updated_at: string | null
           user_id: string
         }
         Insert: {
           created_at?: string | null
           credits?: number | null
+          credits_reset_at?: string | null
+          credits_used_this_month?: number | null
           last_event?: Json | null
+          plan_ends_at?: string | null
+          plan_id?: number | null
+          plan_starts_at?: string | null
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
           updated_at?: string | null
           user_id: string
         }
         Update: {
           created_at?: string | null
           credits?: number | null
+          credits_reset_at?: string | null
+          credits_used_this_month?: number | null
           last_event?: Json | null
+          plan_ends_at?: string | null
+          plan_id?: number | null
+          plan_starts_at?: string | null
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
           updated_at?: string | null
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "user_billing_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "subscription_plans"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
+      check_user_credits: {
+        Args: { p_user_id: string; p_credits_needed: number }
+        Returns: boolean
+      }
+      deduct_user_credits: {
+        Args: {
+          p_user_id: string
+          p_credits_to_deduct: number
+          p_transaction_type: string
+          p_description?: string
+        }
+        Returns: boolean
+      }
       get_random_authors_by_genre: {
         Args: { p_genre_slug: string; p_limit: number }
         Returns: {
@@ -981,6 +1095,19 @@ export type Database = {
           model_name: string
         }[]
       }
+      get_user_billing_info: {
+        Args: { p_user_id: string }
+        Returns: {
+          credits: number
+          credits_used_this_month: number
+          credits_reset_at: string
+          plan_name: string
+          plan_slug: string
+          plan_description: string
+          plan_credits_per_month: number
+          plan_price_cents: number
+        }[]
+      }
       recalculate_book_likes: {
         Args: Record<PropertyKey, never>
         Returns: number
@@ -988,6 +1115,10 @@ export type Database = {
       recalculate_page_likes: {
         Args: Record<PropertyKey, never>
         Returns: number
+      }
+      reset_monthly_credits: {
+        Args: { p_user_id: string }
+        Returns: undefined
       }
       save_search_results: {
         Args:
@@ -1002,6 +1133,21 @@ export type Database = {
               p_page_number: number
               p_page_size: number
               p_books: Json
+            }
+          | {
+              p_hash: string
+              p_user_id: string
+              p_free_text: string
+              p_language_code: string
+              p_genre_slug: string
+              p_tag_slugs: string[]
+              p_model_id: number
+              p_page_number: number
+              p_page_size: number
+              p_books: Json
+              p_should_deduct_credits?: boolean
+              p_credit_cost?: number
+              p_search_description?: string
             }
           | {
               p_hash: string
