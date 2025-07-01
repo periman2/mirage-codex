@@ -71,7 +71,7 @@ type ModelWithCredits = {
 // Type for tracking the current paginated search parameters
 interface PaginatedSearchState {
   freeText: string
-  genreSlug: string // Keep as string, use empty string for no genre
+  genreSlug: string // Keep as string, use empty string for auto-detected genre
   tagSlugs: string[]
   model: ModelWithCredits
 }
@@ -149,8 +149,8 @@ function SearchPageContent() {
       if ((validGenre || urlQuery.trim()) && modelToUse) {
         searchMutation.mutate({
           freeText: urlQuery || undefined,
-          languageCode: urlLanguage || undefined, // Don't send language if not in URL
-          genreSlug: urlGenre || undefined, // Allow undefined genre
+          languageCode: validLanguage ? urlLanguage : undefined, // Only send language if valid
+          genreSlug: validGenre ? urlGenre : undefined, // Only send genre if valid (converts 'auto' to undefined)
           tagSlugs: urlTags,
           modelId: modelToUse.id,
           pageNumber: urlPage,
@@ -215,9 +215,13 @@ function SearchPageContent() {
   const hasSearchParametersChanged = useMemo(() => {
     if (!paginatedSearchState || currentPage === 1) return false
 
+    // Normalize genre values for comparison ('auto' in UI maps to '' in paginated state)
+    const normalizedSelectedGenre = selectedGenre === 'auto' ? '' : selectedGenre
+    const normalizedPaginatedGenre = paginatedSearchState.genreSlug
+
     return (
       searchQuery.trim() !== paginatedSearchState.freeText ||
-      selectedGenre !== paginatedSearchState.genreSlug ||
+      normalizedSelectedGenre !== normalizedPaginatedGenre ||
       JSON.stringify([...selectedTags].sort()) !== JSON.stringify([...paginatedSearchState.tagSlugs].sort()) ||
       selectedModel?.id !== paginatedSearchState.model?.id
     )
@@ -228,7 +232,7 @@ function SearchPageContent() {
     if (!paginatedSearchState) return
 
     setSearchQuery(paginatedSearchState.freeText)
-    setSelectedGenre(paginatedSearchState.genreSlug)
+    setSelectedGenre(paginatedSearchState.genreSlug || 'auto') // Convert empty string back to 'auto' for UI
     setSelectedTags([...paginatedSearchState.tagSlugs])
     setSelectedModel(paginatedSearchState.model)
   }
@@ -254,11 +258,11 @@ function SearchPageContent() {
         page: newPage
       })
 
-      // Trigger new search with the new page
+                // Trigger new search with the new page
       searchMutation.mutate({
         freeText: paginatedSearchState.freeText || undefined,
         languageCode: selectedLanguage === 'auto' ? undefined : selectedLanguage || undefined, // Convert "auto" to undefined
-        genreSlug: paginatedSearchState.genreSlug || undefined,
+        genreSlug: paginatedSearchState.genreSlug || undefined, // Convert empty string to undefined
         tagSlugs: paginatedSearchState.tagSlugs,
         modelId: paginatedSearchState.model.id,
         pageNumber: newPage,
@@ -296,10 +300,12 @@ function SearchPageContent() {
       // Update paginated search state when search succeeds
       setPaginatedSearchState({
         freeText: variables.freeText || '',
-        genreSlug: variables.genreSlug || 'auto', // Use "auto" for consistency with UI state
+        genreSlug: variables.genreSlug || '', // Store empty string instead of 'auto' to preserve API format
         tagSlugs: [...variables.tagSlugs],
         model: selectedModel!
       })
+
+
 
       if (data.cached) {
         toast.success(`Found cached results for page ${variables.pageNumber} - no credits used!`)
@@ -715,7 +721,7 @@ function SearchPageContent() {
                         </div>
                         <div className="flex flex-wrap gap-4">
                           <span>
-                            <span className="font-medium">Genre:</span> {genres?.find(g => g.slug === paginatedSearchState.genreSlug)?.label}
+                            <span className="font-medium">Genre:</span> {paginatedSearchState.genreSlug ? genres?.find(g => g.slug === paginatedSearchState.genreSlug)?.label : 'Auto-detected'}
                           </span>
                           {paginatedSearchState.tagSlugs.length > 0 && (
                             <span>
