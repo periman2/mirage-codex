@@ -15,7 +15,7 @@ interface RouteParams {
 }
 
 // Configuration constants
-const CONTEXT_PAGES_COUNT = 30 // Number of previous pages to include for context
+const CONTEXT_PAGES_COUNT = 50 // Number of previous pages to include for context
 const DEFAULT_TEMPERATURE = 0.8 // Fallback temperature if genre doesn't specify
 
 // Allow streaming responses up to 60 seconds

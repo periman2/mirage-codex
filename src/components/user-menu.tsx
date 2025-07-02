@@ -112,18 +112,6 @@ export function UserMenu() {
               <Bookmark className="mr-2 h-4 w-4" />
               My Bookmarks
             </Button>
-
-            <Button 
-              variant="ghost" 
-              className="w-full justify-start"
-              onClick={() => {
-                setIsProfileOpen(false)
-                // TODO: Add settings page
-              }}
-            >
-              <Settings className="mr-2 h-4 w-4" />
-              Settings
-            </Button>
           </div>
 
           <div className="border-t pt-4">
