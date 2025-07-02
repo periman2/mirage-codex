@@ -3,6 +3,7 @@ import { createSupabaseServerClient, createSupabaseAdminClient } from '@/lib/sup
 import { createSearchHash, validateSearchParams } from '@/lib/hash'
 import { generateBooks, generateAuthors, determineGenreAndLanguage, PAGE_SIZE, AuthorSchema } from '@/lib/ai'
 import { getSearchCreditCost } from '@/lib/credit-constants'
+import { getProjectConfig } from '@/lib/project-config'
 import { z } from 'zod'
 import { SupabaseClient } from '@supabase/supabase-js'
 import { Database, Tables } from '@/lib/database.types'
@@ -427,8 +428,13 @@ export async function POST(request: NextRequest) {
     // NEW AUTHOR SELECTION/GENERATION LOGIC
     console.log('👥 Starting author selection/generation process...')
     
-    // Roll the dice - 50% chance to try existing authors
-    const shouldTryExistingAuthors = Math.random() < 0.5
+    // Get the probability for trying existing authors from project config
+    const aiSettings = await getProjectConfig('ai_settings')
+    const existingAuthorsProbability = aiSettings?.existing_authors_probability || 0.5
+    
+    // Roll the dice using configured probability
+    const shouldTryExistingAuthors = Math.random() < existingAuthorsProbability;
+    
     console.log('🎲 Dice roll for existing authors:', shouldTryExistingAuthors)
     
     let finalAuthors: Array<{ id: string; penName: string; stylePrompt: string; bio: string }> = []
@@ -436,6 +442,7 @@ export async function POST(request: NextRequest) {
     if (shouldTryExistingAuthors) {
       console.log('🔍 Attempting to use existing authors...')
       finalAuthors = await selectExistingAuthorsByGenre(supabase, finalGenreSlug, PAGE_SIZE)
+      console.log('FOUND finalAuthors:', finalAuthors)
     }
     
     // If we don't have enough authors, generate new ones
@@ -450,6 +457,7 @@ export async function POST(request: NextRequest) {
         languageCode: finalLanguageCode,
         modelName: model.name,
         modelDomain: model.domain_code,
+        freeText: finalSearchParams.freeText ?? undefined,
         count: authorsNeeded,
       })
 
@@ -530,6 +538,8 @@ export async function POST(request: NextRequest) {
       shouldDeductCredits: !hasApiKey,
       creditCost: searchCreditCost || 0
     })
+
+    // console.log('🔍 booksWithAuthorIds:', booksWithAuthorIds)
     
     const { data: saveResult } = await supabase
       .rpc('save_search_results', {

@@ -3,7 +3,7 @@ import { streamText } from 'ai'
 import { createSupabaseServerClient } from '@/lib/supabase'
 import { getAIProvider } from '@/lib/ai'
 import { getPageGenerationCreditCost } from '@/lib/credit-constants'
-import { PostHog } from 'posthog-node'
+import { getPageGenerationConfig, isFeatureEnabled } from '@/lib/project-config'
 import fs from 'fs'
 import path from 'path'
 
@@ -14,11 +14,10 @@ interface RouteParams {
   }>
 }
 
-// Configuration constants
-const CONTEXT_PAGES_COUNT = 50 // Number of previous pages to include for context
-const DEFAULT_TEMPERATURE = 0.8 // Fallback temperature if genre doesn't specify
+// Configuration constants will be loaded from project_config table
 
-// Allow streaming responses up to 60 seconds
+// Allow streaming responses up to configured duration (default 60 seconds)
+// Note: This will be dynamically loaded from project config in the handler
 export const maxDuration = 60
 
 // GET endpoint to check if page exists
@@ -86,14 +85,11 @@ export async function POST(
 
     const supabase = await createSupabaseServerClient()
 
-    // Initialize PostHog
-    const posthog = new PostHog(
-      process.env.NEXT_PUBLIC_POSTHOG_KEY!,
-      { host: process.env.NEXT_PUBLIC_POSTHOG_HOST || 'https://app.posthog.com' }
-    )
-
+    // Load project configuration
+    const pageGenConfig = await getPageGenerationConfig()
+    
     // Check if image generation feature is enabled
-    const imagesEnabled = await posthog.isFeatureEnabled('book-page-images', 'default')
+    const imagesEnabled = await isFeatureEnabled('book_page_images')
     console.log('🎨 Images enabled:', imagesEnabled)
 
     // Get edition details including book, author, genre, and model info
@@ -248,11 +244,11 @@ export async function POST(
       console.log('⏭️ Using BYO API key - no credit check needed')
     }
 
-    // Get previous pages content for context (last CONTEXT_PAGES_COUNT pages)
+    // Get previous pages content for context (last context_pages_count pages)
     let contextPagesContent = ''
     const currentPageNum = parseInt(pageNumber)
     if (currentPageNum > 1) {
-      const startPage = Math.max(1, currentPageNum - CONTEXT_PAGES_COUNT)
+      const startPage = Math.max(1, currentPageNum - pageGenConfig.context_pages_count)
       const endPage = currentPageNum - 1
 
       const { data: contextPages } = await supabase
@@ -308,7 +304,7 @@ export async function POST(
 
     // Get genre-specific settings
     const genre = editionDetails.books.genres
-    const modelTemperature = genre.model_temperature || DEFAULT_TEMPERATURE
+    const modelTemperature = genre.model_temperature || pageGenConfig.default_temperature
     const tokensPerPage = genre.tokens_per_page || 500
     const formatInstructions = genre.book_format_prompt || `Format as a narrative page with natural paragraph breaks and proper dialogue formatting.`
 

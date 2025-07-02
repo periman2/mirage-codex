@@ -16,7 +16,7 @@ export async function POST(
   try {
     const { editionId, content } = await request.json()
     const { pageNumber } = await params
-    
+
     console.log('💾 Saving page content:', { editionId, pageNumber })
 
     const supabase = await createSupabaseServerClient()
@@ -82,28 +82,48 @@ export async function POST(
 
     // Deduct credits only if page was saved successfully and user doesn't have BYO API key
     if (!hasApiKey) {
-      const pageGenerationCreditCost = await getPageGenerationCreditCost(editionDetails.model_id)
-      console.log(`💳 Deducting ${pageGenerationCreditCost} credits for saved page`)
-      
-      // Use admin client for credit deduction to ensure proper permissions
-      const { data: deductionSuccess, error: deductionError } = await adminSupabase
-        .rpc('deduct_user_credits', {
-          p_user_id: user.id,
-          p_credits_to_deduct: pageGenerationCreditCost,
-          p_transaction_type: 'page_generation',
-          p_description: `Generated page ${pageNumber} for "${editionDetails.books.title}"`
-        })
-      
-      console.log('💳 Credit deduction result:', { deductionSuccess, deductionError })
-      
-      if (deductionError) {
-        console.error('❌ Error deducting credits:', deductionError)
-        // Don't fail the save since page is already saved - just log the issue
-        console.log('⚠️ Page saved but credit deduction failed')
-      } else if (!deductionSuccess) {
-        console.log('⚠️ Page saved but credit deduction returned false')
+      // Check if this is the first page saved for this edition
+      const { error: countError, count } = await adminSupabase
+        .from('book_pages')
+        .select('*', { count: 'exact', head: true })
+        .eq('edition_id', editionId);
+
+      if (countError) {
+        console.error('❌ Error checking existing pages:', countError)
+        return NextResponse.json(
+          { error: 'Failed to check existing pages' },
+          { status: 500 }
+        )
+      }
+
+      const isFirstPage = count === 1 // Since we just inserted one page
+
+      if (isFirstPage) {
+        console.log('🎉 First page is free! Skipping credit deduction')
       } else {
-        console.log('✅ Credits deducted successfully after page save')
+        const pageGenerationCreditCost = await getPageGenerationCreditCost(editionDetails.model_id)
+        console.log(`💳 Deducting ${pageGenerationCreditCost} credits for saved page`)
+
+        // Use admin client for credit deduction to ensure proper permissions
+        const { data: deductionSuccess, error: deductionError } = await adminSupabase
+          .rpc('deduct_user_credits', {
+            p_user_id: user.id,
+            p_credits_to_deduct: pageGenerationCreditCost,
+            p_transaction_type: 'page_generation',
+            p_description: `Generated page ${pageNumber} for "${editionDetails.books.title}"`
+          })
+
+        console.log('💳 Credit deduction result:', { deductionSuccess, deductionError })
+
+        if (deductionError) {
+          console.error('❌ Error deducting credits:', deductionError)
+          // Don't fail the save since page is already saved - just log the issue
+          console.log('⚠️ Page saved but credit deduction failed')
+        } else if (!deductionSuccess) {
+          console.log('⚠️ Page saved but credit deduction returned false')
+        } else {
+          console.log('✅ Credits deducted successfully after page save')
+        }
       }
     } else {
       console.log('⏭️ Skipping credit deduction (user has API key)')

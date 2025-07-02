@@ -81,6 +81,7 @@ export async function generateAuthors(params: {
   languageCode: string
   modelName: string
   modelDomain: string
+  freeText?: string
   count: number
 }): Promise<Array<z.infer<typeof AuthorSchema>>> {
   console.log('generateAuthors called with count:', params.count, 'for genre:', params.genrePrompt)
@@ -99,6 +100,8 @@ REQUIREMENTS:
 - Vary writing styles to create interesting diversity
 - Authors should feel like they belong in this genre but have unique voices
 - Make them feel real and established in the literary world
+
+${params.freeText ? `THIS IS THE USER'S QUERY FOR SEARCHING THE LIBRARY, FOLLOW IT CAREFULLY WHEN CRAFTING THE AUTHORS, ANY INSTRUCTIONS RELATED TO THE AUTHORS THAT MIGHT EXIST HERE ARE MORE IMPORTANT THAN YOUR PREVIOUS INSTRUCTIONS: "${params.freeText}"` : ''}
 
 CREATIVITY: Be highly creative and unexpected in your author creations. Think of authors who might exist in parallel literary universes.`
 
@@ -253,13 +256,13 @@ export async function generateBooks(params: {
   // Build the system prompt
   const systemPrompt = `You are a librarian of an infinite, hallucinatory library. Generate completely fictional books that never existed.
 
-PAGINATION CONTEXT: You are generating page ${params.pageNumber} of results, with ${params.pageSize} books per page. Generate books ${((params.pageNumber - 1) * params.pageSize) + 1} through ${params.pageNumber * params.pageSize} in the infinite catalog for this search query.
+PAGINATION CONTEXT: You are generating page ${params.pageNumber} of results, with ${params.pageSize} books per page. Generate books ${((params.pageNumber - 1) * params.pageSize) + 1} through ${params.pageNumber * params.pageSize} in the for this search query.
 
 GENRE CONTEXT: ${params.genrePrompt}
 
 TAG INFLUENCES: ${params.tagPrompts.join(', ')}
 
-LANGUAGE: Generate titles and content in language code "${params.languageCode}"
+LANGUAGE: Generate titles, summary and content in language with code: "${params.languageCode}"
 
 SECTION REQUIREMENTS:
 - Create realistic sections based on book type (chapters for novels, recipes for cookbooks, papers for academic works, etc.)
@@ -267,26 +270,38 @@ SECTION REQUIREMENTS:
 - Make section titles specific and descriptive
 - Provide meaningful summaries for each section
 
-BOOK TYPE EXAMPLES:
-- Novel: Chapters with narrative progression
-- Cookbook: Recipe sections with ingredient lists and techniques
-- Academic: Introduction, methodology, results, conclusion
-- Poetry: Thematic collections or chronological arrangements
-- Biography: Life periods or significant events
-- Manual: Step-by-step guides and reference sections
-
 REQUIREMENTS:
 - All books must be completely fictional and original
 - Vary page counts realistically based on genre and book type
-- Create compelling summaries that make readers want to explore
 - Make titles memorable and genre-appropriate
 - Ensure sections flow logically and cover the entire page range
 - Generate vivid, single-sentence book cover descriptions that capture the essence and mood of each book
 - Do not include author information - authors will be assigned separately
 
-${params.freeText ? `USER QUERY: "${params.freeText}"` : ''}
+${params.freeText ? `THIS IS THE USER'S QUERY, FOLLOW IT CAREFULLY WHEN CRAFTING THE BOOKS, ANY INSTRUCTIONS THAT MIGHT EXIST HERE ARE MORE IMPORTANT THAN YOUR PREVIOUS INSTRUCTIONS: "${params.freeText}"` : ''}
 
 Generate books that feel like they could exist in a parallel universe's literary canon.`
+
+  // Save system prompt to debug folder in development
+  if (process.env.NODE_ENV === 'development') {
+    const fs = require('fs')
+    const path = require('path')
+    
+    // Create debug folder if it doesn't exist
+    const debugDir = path.join(process.cwd(), 'debug')
+    if (!fs.existsSync(debugDir)) {
+      fs.mkdirSync(debugDir, { recursive: true })
+    }
+    
+    // Save system prompt with timestamp
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
+    const filename = `generateBooks-system-prompt-${timestamp}.txt`
+    const filepath = path.join(debugDir, filename)
+    
+    fs.writeFileSync(filepath, systemPrompt, 'utf8')
+    console.log(`📝 System prompt saved to: ${filepath}`)
+  }
+
 
   const result = await generateObject({
     model,
@@ -297,147 +312,6 @@ Generate books that feel like they could exist in a parallel universe's literary
   })
 
   return result.object
-}
-
-/**
- * Generate content for a specific page of a book using streaming
- */
-export async function generatePageStreaming(params: {
-  bookTitle: string
-  authorName: string
-  authorStyle: string
-  pageNumber: number
-  totalPages: number
-  sections: Array<z.infer<typeof SectionSchema>>
-  previousPageContent?: string
-  languageCode: string
-  modelName: string
-  modelDomain: string
-  onChunk: (chunk: string) => void
-  onFinish: (fullContent: string) => void
-  onError: (error: Error) => void
-}): Promise<void> {
-  console.log('🔄 Starting page generation streaming for page:', params.pageNumber)
-
-  const model = createModel(params.modelDomain, params.modelName)
-
-  // Find which section this page belongs to
-  const currentSection = params.sections.find(section =>
-    params.pageNumber >= section.fromPage && params.pageNumber <= section.toPage
-  )
-
-  if (!currentSection) {
-    const error = new Error(`No section found for page ${params.pageNumber}`)
-    params.onError(error)
-    return
-  }
-
-  // Calculate position within the section
-  const sectionProgress = (params.pageNumber - currentSection.fromPage) / (currentSection.toPage - currentSection.fromPage)
-  const isFirstPageOfSection = params.pageNumber === currentSection.fromPage
-  const isLastPageOfSection = params.pageNumber === currentSection.toPage
-
-  // Build context about genre and formatting based on book title and author style
-  const genreContext = getGenreFormattingHints(params.bookTitle, params.authorStyle)
-
-  const systemPrompt = `You are writing page ${params.pageNumber} of ${params.totalPages} for the book "${params.bookTitle}" by ${params.authorName}.
-
-AUTHOR STYLE: ${params.authorStyle}
-
-CURRENT SECTION: ${currentSection.title}
-SECTION SUMMARY: ${currentSection.summary}
-SECTION PAGES: ${currentSection.fromPage}-${currentSection.toPage}
-POSITION IN SECTION: ${Math.round(sectionProgress * 100)}% through this section
-${isFirstPageOfSection ? 'THIS IS THE FIRST PAGE OF THIS SECTION' : ''}
-${isLastPageOfSection ? 'THIS IS THE LAST PAGE OF THIS SECTION' : ''}
-
-${params.previousPageContent ? `PREVIOUS PAGE CONTEXT: The previous page ended with this content:
-"${params.previousPageContent.slice(-200)}..."
-
-Continue naturally from where the previous page left off.` : ''}
-
-LANGUAGE: Write in language code "${params.languageCode}"
-
-FORMATTING & STYLE:
-${genreContext}
-- Use proper paragraph breaks and formatting
-- Include dialogue tags and narrative descriptions as appropriate
-- Use markdown formatting where it enhances readability (italics, bold, etc.)
-- Write approximately 250-400 words per page
-- Make the content immersive and engaging
-
-REQUIREMENTS:
-- Write authentic content that matches the author's style and book type
-- Make this page feel like part of the larger section and book
-- Maintain consistency with the book's genre and tone
-- Do not include page numbers or headers in the content
-- If first page of section, consider introducing the section topic appropriately
-- If last page of section, consider concluding the section naturally
-- Ensure smooth continuation from any previous page content
-
-Write compelling, immersive content that draws readers into this fictional world.`
-
-  let fullContent = ''
-
-  try {
-    const result = await streamText({
-      model,
-      system: systemPrompt,
-      prompt: `Write the content for page ${params.pageNumber}, which is ${Math.round(sectionProgress * 100)}% through the "${currentSection.title}" section.`,
-      temperature: 0.7,
-    })
-
-    for await (const delta of result.textStream) {
-      fullContent += delta
-      params.onChunk(delta)
-    }
-
-    console.log('✅ Page generation streaming completed')
-    params.onFinish(fullContent)
-
-  } catch (error) {
-    console.error('❌ Page generation streaming failed:', error)
-    params.onError(error instanceof Error ? error : new Error('Unknown error'))
-  }
-}
-
-/**
- * Get genre-specific formatting hints based on book title and author style
- */
-function getGenreFormattingHints(bookTitle: string, authorStyle: string): string {
-  const title = bookTitle.toLowerCase()
-  const style = authorStyle.toLowerCase()
-
-  // Detect likely genre/format based on title and style
-  if (title.includes('cookbook') || title.includes('recipe') || style.includes('cooking')) {
-    return `- Format as a cookbook with ingredient lists, step-by-step instructions
-- Use clear numbered steps and ingredient measurements
-- Include cooking tips and techniques`
-  }
-
-  if (title.includes('manual') || title.includes('guide') || title.includes('how to')) {
-    return `- Format as a practical guide with clear instructions
-- Use numbered lists and bullet points where appropriate
-- Include helpful tips and warnings`
-  }
-
-  if (title.includes('poetry') || title.includes('poems') || style.includes('poetic')) {
-    return `- Format as poetry with proper line breaks and stanza divisions
-- Use poetic language and imagery
-- Consider different poem forms and styles`
-  }
-
-  if (title.includes('academic') || title.includes('research') || style.includes('scholarly')) {
-    return `- Format as academic text with formal language
-- Include theoretical discussions and analysis
-- Use academic tone and structure`
-  }
-
-  // Default to narrative fiction
-  return `- Format as narrative prose with dialogue and descriptions
-- Use proper paragraph structure for readability
-- Include dialogue with proper formatting and tags
-- Balance action, dialogue, and description`
 }
 
 /**

@@ -732,6 +732,24 @@ export type Database = {
         }
         Relationships: []
       }
+      project_config: {
+        Row: {
+          key: string
+          updated_at: string | null
+          value: Json
+        }
+        Insert: {
+          key: string
+          updated_at?: string | null
+          value: Json
+        }
+        Update: {
+          key?: string
+          updated_at?: string | null
+          value?: Json
+        }
+        Relationships: []
+      }
       search_books: {
         Row: {
           book_id: string
@@ -1034,6 +1052,15 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      add_user_credits: {
+        Args: {
+          p_user_id: string
+          p_credits_to_add: number
+          p_transaction_type?: string
+          p_description?: string
+        }
+        Returns: boolean
+      }
       check_user_credits: {
         Args: { p_user_id: string; p_credits_needed: number }
         Returns: boolean
@@ -1046,6 +1073,18 @@ export type Database = {
           p_description?: string
         }
         Returns: boolean
+      }
+      get_all_project_config: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          key: string
+          value: Json
+          updated_at: string
+        }[]
+      }
+      get_project_config: {
+        Args: { p_key: string }
+        Returns: Json
       }
       get_random_authors_by_genre: {
         Args: { p_genre_slug: string; p_limit: number }
@@ -1161,6 +1200,10 @@ export type Database = {
               p_page_number?: number
             }
         Returns: Json
+      }
+      set_project_config: {
+        Args: { p_key: string; p_value: Json }
+        Returns: boolean
       }
       toggle_book_like: {
         Args: { p_user_id: string; p_book_id: string }
