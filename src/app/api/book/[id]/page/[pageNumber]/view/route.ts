@@ -40,7 +40,8 @@ export async function POST(
       .select('id')
       .eq('edition_id', editionId)
       .eq('page_number', pageNum)
-      .single()
+      .limit(1)
+      .maybeSingle()
 
     if (pageError || !page) {
       return NextResponse.json(

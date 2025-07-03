@@ -28,7 +28,8 @@ export async function POST(
       .from('books')
       .select('id')
       .eq('id', bookId)
-      .single()
+      .limit(1)
+      .maybeSingle()
 
     if (bookError || !book) {
       return NextResponse.json(

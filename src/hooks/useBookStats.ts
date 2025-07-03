@@ -90,6 +90,7 @@ export function useBookLike(bookId: string) {
 
 // Hook for tracking book views
 export function useBookView(bookId: string) {
+
   const supabase = createSupabaseBrowserClient()
   const [hasTrackedView, setHasTrackedView] = useState(false)
 
@@ -159,7 +160,7 @@ export function usePageStats(bookId: string, pageNumber: number, editionId: stri
       return response.json()
     },
     enabled: !!editionId && enabled,
-    staleTime: 1 * 60 * 1000, // 1 minute
+    staleTime: 0,
     refetchOnWindowFocus: false
   })
 }
@@ -278,7 +279,7 @@ export function usePageContent(
         }
 
         const data = await response.json();
-        console.log('✅ usePageContent queryFn success', data);
+        // console.log('✅ usePageContent queryFn success', data);
         
         // Call success callback if provided
         if (onSuccess) {
@@ -329,17 +330,18 @@ export function useBookmark(userId: string | undefined, editionId: string | unde
         .eq('user_id', userId)
         .eq('edition_id', editionId)
         .eq('page_number', pageNumber)
-        .single()
+        .limit(1)
+        .maybeSingle()
 
       if (error && error.code !== 'PGRST116') { // PGRST116 is "not found"
         console.error('Error loading bookmark:', error)
         throw error
       }
 
-      return data || null
+      return data
     },
     enabled: !!userId && !!editionId && !!pageNumber && enabled,
-    staleTime: 0, // 0.5 minute
+    staleTime: 0,
     refetchOnWindowFocus: false
   })
 }

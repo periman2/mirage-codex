@@ -556,7 +556,8 @@ export function useBook(bookId: string) {
           )
         `)
         .eq('id', bookId)
-        .single()
+        .limit(1)
+        .maybeSingle()
       
       if (error) throw error
       return data

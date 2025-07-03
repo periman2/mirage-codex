@@ -30,7 +30,8 @@ export async function getSearchCreditCost(modelId: number): Promise<number> {
       .select('search_credits')
       .eq('id', modelId)
       .eq('is_active', true)
-      .single()
+      .limit(1)
+      .maybeSingle()
     
     if (error || !model) {
       console.warn(`Failed to fetch search credits for model ${modelId}, using default:`, error)
@@ -56,7 +57,8 @@ export async function getPageGenerationCreditCost(modelId: number): Promise<numb
       .select('page_generation_credits')
       .eq('id', modelId)
       .eq('is_active', true)
-      .single()
+      .limit(1)
+      .maybeSingle()
     
     if (error || !model) {
       console.warn(`Failed to fetch page generation credits for model ${modelId}, using default:`, error)
@@ -85,7 +87,8 @@ export async function getModelCreditCosts(modelId: number): Promise<{
       .select('search_credits, page_generation_credits')
       .eq('id', modelId)
       .eq('is_active', true)
-      .single()
+      .limit(1)
+      .maybeSingle()
     
     if (error || !model) {
       console.warn(`Failed to fetch credit costs for model ${modelId}, using defaults:`, error)

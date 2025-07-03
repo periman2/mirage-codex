@@ -52,7 +52,8 @@ export async function GET(
       .from('book_page_images')
       .select('image_url')
       .eq('hash', hash)
-      .single()
+      .limit(1)
+      .maybeSingle()
 
     if (checkError && checkError.code !== 'PGRST116') {
       console.error('❌ Error checking existing image:', checkError)

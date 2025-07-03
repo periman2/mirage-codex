@@ -39,7 +39,8 @@ export async function POST(
         models (domain_code)
       `)
       .eq('id', editionId)
-      .single()
+      .limit(1)
+      .maybeSingle()
 
     if (editionError || !editionDetails) {
       console.error('❌ Edition not found:', editionError)
@@ -55,7 +56,8 @@ export async function POST(
       .select('api_key_enc')
       .eq('user_id', user.id)
       .eq('domain_code', editionDetails.models.domain_code)
-      .single()
+      .limit(1)
+      .maybeSingle()
 
     const hasApiKey = !!userApiKey
     console.log('🔑 User has API key:', hasApiKey)

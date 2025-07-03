@@ -93,7 +93,8 @@ async function saveGeneratedAuthors(
     .from('genres')
     .select('id')
     .eq('slug', currentGenreSlug)
-    .single()
+    .limit(1)
+    .maybeSingle()
 
   if (!currentGenre) {
     throw new Error(`Genre not found: ${currentGenreSlug}`)
@@ -272,7 +273,8 @@ export async function POST(request: NextRequest) {
         .from('models')
         .select('name, domain_code')
         .eq('id', validatedInput.modelId)
-        .single()
+        .limit(1)
+        .maybeSingle()
       
       if (!model) {
         console.error('❌ Model not found for AI determination')
@@ -342,7 +344,8 @@ export async function POST(request: NextRequest) {
       .from('genres')
       .select('prompt_boost')
       .eq('slug', finalGenreSlug)
-      .single()
+      .limit(1)
+      .maybeSingle()
 
     console.log('📖 Genre data:', genre)
 
@@ -350,7 +353,8 @@ export async function POST(request: NextRequest) {
       .from('models')
       .select('name, domain_code')
       .eq('id', finalSearchParams.modelId)
-      .single()
+      .limit(1)
+      .maybeSingle()
 
     console.log('🤖 Model data:', model)
 
@@ -380,7 +384,8 @@ export async function POST(request: NextRequest) {
       .select('api_key_enc')
       .eq('user_id', user.id)
       .eq('domain_code', model.domain_code)
-      .single()
+      .limit(1)
+      .maybeSingle()
 
     console.log('🔑 User API key found:', !!userApiKey)
     const hasApiKey = !!userApiKey

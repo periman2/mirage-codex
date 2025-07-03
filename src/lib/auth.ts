@@ -76,7 +76,8 @@ export async function updateProfile(userId: string, updates: Partial<Profile>) {
     })
     .eq('user_id', userId)
     .select()
-    .single()
+    .limit(1)
+    .maybeSingle()
 
   if (error) throw error
   return data
@@ -89,7 +90,8 @@ export async function getProfile(userId: string): Promise<Profile | null> {
     .from('profiles')
     .select('*')
     .eq('user_id', userId)
-    .single()
+    .limit(1)
+    .maybeSingle()
 
   if (error) {
     if (error.code === 'PGRST116') {

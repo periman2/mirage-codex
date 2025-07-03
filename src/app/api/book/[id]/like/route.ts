@@ -42,7 +42,8 @@ export async function POST(
       .from('books')
       .select('id')
       .eq('id', bookId)
-      .single()
+      .limit(1)
+      .maybeSingle()
 
     if (bookError || !book) {
       return NextResponse.json(
@@ -114,7 +115,8 @@ export async function GET(
           .eq('user_id', user.id)
           .eq('book_id', bookId)
           .eq('reaction_type', 'like')
-          .single()
+          .limit(1)
+          .maybeSingle()
 
         userLiked = !!existingLike
       }
@@ -125,7 +127,8 @@ export async function GET(
       .from('book_stats')
       .select('likes_cnt, views_cnt')
       .eq('book_id', bookId)
-      .single()
+      .limit(1)
+      .maybeSingle()
 
     if (statsError) {
       console.error('Error fetching book stats:', statsError)

@@ -1,20 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { createSupabaseServerClient } from '@/lib/supabase'
+import { createSupabaseServerClient } from './supabase'
+import { BookData } from '@/hooks/useBookData'
 
-interface RouteParams {
-  params: Promise<{
-    id: string
-  }>
-}
-
-export async function GET(
-  request: NextRequest,
-  { params }: RouteParams
-) {
+export async function fetchBookData(bookId: string): Promise<BookData | null> {
   try {
-    const { id: bookId } = await params
-    console.log('📚 Book details request for ID:', bookId)
-
     const supabase = await createSupabaseServerClient()
 
     // Get book details with author, sections, genre, edition, and stats information
@@ -55,13 +43,8 @@ export async function GET(
 
     if (bookError || !book) {
       console.error('❌ Book not found:', bookError)
-      return NextResponse.json(
-        { error: 'Book not found' },
-        { status: 404 }
-      )
+      return null
     }
-
-    console.log('📖 Book found:', book.title)
 
     // Get book sections
     const { data: sections, error: sectionsError } = await supabase
@@ -72,10 +55,7 @@ export async function GET(
 
     if (sectionsError) {
       console.error('❌ Failed to get sections:', sectionsError)
-      return NextResponse.json(
-        { error: 'Failed to get book sections' },
-        { status: 500 }
-      )
+      return null
     }
 
     // Get all editions for this book
@@ -96,14 +76,11 @@ export async function GET(
 
     if (editionsError || !editions || editions.length === 0) {
       console.error('❌ Failed to get editions:', editionsError)
-      return NextResponse.json(
-        { error: 'Failed to get book editions' },
-        { status: 500 }
-      )
+      return null
     }
 
-    // Format the response
-    const bookData = {
+    // Format the response to match BookData interface
+    const bookData: BookData = {
       id: book.id,
       title: book.title,
       summary: book.summary,
@@ -139,14 +116,9 @@ export async function GET(
       }
     }
 
-    console.log('✅ Returning book data')
-    return NextResponse.json(bookData)
-
+    return bookData
   } catch (error) {
-    console.error('💥 Book details error:', error)
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Internal server error' },
-      { status: 500 }
-    )
+    console.error('💥 Book data fetch error:', error)
+    return null
   }
 } 

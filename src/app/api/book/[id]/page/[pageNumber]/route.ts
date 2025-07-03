@@ -47,7 +47,8 @@ export async function GET(
       .select('content')
       .eq('edition_id', editionId)
       .eq('page_number', parseInt(pageNumber))
-      .single()
+      .limit(1)
+      .maybeSingle()
 
     if (existingPage) {
       console.log('✅ Page found in cache')
@@ -128,7 +129,8 @@ export async function POST(
         )
       `)
       .eq('id', editionId)
-      .single()
+      .limit(1)
+      .maybeSingle()
 
     if (editionError || !editionDetails) {
       console.error('❌ Edition not found:', editionError)
@@ -153,7 +155,7 @@ export async function POST(
       `)
       .eq('book_id', editionDetails.book_id)
       .limit(1)
-      .single()
+      .maybeSingle()
 
     // Extract search context
     let originalSearchQuery = null
@@ -198,7 +200,8 @@ export async function POST(
       .select('api_key_enc')
       .eq('user_id', user.id)
       .eq('domain_code', editionDetails.models.domain_code)
-      .single()
+      .limit(1)
+      .maybeSingle()
 
     console.log('🔑 User API key found:', !!userApiKey)
     const hasApiKey = !!userApiKey

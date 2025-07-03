@@ -45,7 +45,8 @@ export async function POST(
       .select('id')
       .eq('edition_id', editionId)
       .eq('page_number', pageNum)
-      .single()
+      .limit(1)
+      .maybeSingle()
 
     if (pageError || !page) {
       return NextResponse.json(
@@ -120,7 +121,8 @@ export async function GET(
       .select('id')
       .eq('edition_id', editionId)
       .eq('page_number', pageNum)
-      .single()
+      .limit(1)
+      .maybeSingle()
 
     if (pageError || !page) {
       return NextResponse.json(
@@ -146,7 +148,8 @@ export async function GET(
           .eq('user_id', user.id)
           .eq('page_id', pageId)
           .eq('reaction_type', 'like')
-          .single()
+          .limit(1)
+          .maybeSingle()
 
         userLiked = !!existingLike
       }
@@ -157,7 +160,8 @@ export async function GET(
       .from('page_stats')
       .select('likes_cnt, views_cnt')
       .eq('page_id', pageId)
-      .single()
+      .limit(1)
+      .maybeSingle()
 
     if (statsError) {
       console.error('Error fetching page stats:', statsError)

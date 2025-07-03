@@ -27,7 +27,8 @@ export async function GET(
       .from('books')
       .select('id, title, cover_url, book_cover_prompt')
       .eq('id', bookId)
-      .single()
+      .limit(1)
+      .maybeSingle()
 
     if (bookError || !book) {
       console.error('❌ Book not found:', bookError)
