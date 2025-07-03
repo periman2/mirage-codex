@@ -58,9 +58,11 @@ export default function BookDetailClient({ bookId, initialBookData }: BookDetail
     const [optimisticBookLike, setOptimisticBookLike] = useState<{ liked: boolean; count: number } | null>(null)
     const [optimisticPageLike, setOptimisticPageLike] = useState<{ liked: boolean; count: number } | null>(null)
 
-    // Page transition state to prevent flickering
+    // Enhanced page transition state with fade control
     const [isPageTransitioning, setIsPageTransitioning] = useState(false)
     const [previousPageContent, setPreviousPageContent] = useState('')
+    const [showNewContent, setShowNewContent] = useState(true) // Controls when new content should fade in
+    const [streamingContentKey, setStreamingContentKey] = useState(0) // Force re-render for streaming animation
 
     // Get adjacent pages to check if they're already generated (only when we need navigation hints)
     const { data: adjacentPages, isLoading: isAdjacentPagesLoading } = useAdjacentPages(
@@ -172,8 +174,6 @@ export default function BookDetailClient({ bookId, initialBookData }: BookDetail
             const trimmedPrompt = prompt.trim()
             const imageUrl = `/api/book/${bookId}/page/${currentPage}/image?prompt=${encodeURIComponent(trimmedPrompt)}&edition=${currentEdition.id}`
 
-            // console.log(`🖼️ Replacing "${match}" with image URL: ${imageUrl}`);
-
             // Simple markdown image syntax - let the browser handle loading
             return `\n\n![Scene: ${trimmedPrompt}](${imageUrl})\n*${trimmedPrompt}*\n\n`
         })
@@ -208,7 +208,12 @@ export default function BookDetailClient({ bookId, initialBookData }: BookDetail
                     console.log('🔄 Page content saved to database')
                     setPageContent(message.content) // Store raw content with patterns
                     setIsPageCached(true) // Mark as cached since we successfully saved to database
-                    setIsPageTransitioning(false) // End transition when generation completes
+                    
+                    // Smooth transition to show new content
+                    setTimeout(() => {
+                        setIsPageTransitioning(false) // End transition when generation completes
+                        setShowNewContent(true) // Fade in new content
+                    }, 150) // Small delay for smooth transition
 
                     // Invalidate credits cache since credits were consumed for page generation
                     invalidateCredits()
@@ -218,6 +223,8 @@ export default function BookDetailClient({ bookId, initialBookData }: BookDetail
                     console.error('❌ Failed to save page content:', error)
                     toast.error('Failed to save page content')
                     setIsPageCached(false) // Keep as false if save failed
+                    setIsPageTransitioning(false) // End transition on error
+                    setShowNewContent(true)
                 }
             }
             setIsGenerating(false)
@@ -248,6 +255,7 @@ export default function BookDetailClient({ bookId, initialBookData }: BookDetail
             toast.error(errorMessage)
             setIsGenerating(false)
             setIsPageTransitioning(false) // End transition on error
+            setShowNewContent(true)
             generationInProgress.current = false
         }
     })
@@ -258,7 +266,7 @@ export default function BookDetailClient({ bookId, initialBookData }: BookDetail
         bookId,
         currentPage,
         currentEdition?.id,
-        true,
+        !!user,
         // onSuccess callback
         (data) => {
             console.log('📄 Page content loaded:', data);
@@ -267,7 +275,13 @@ export default function BookDetailClient({ bookId, initialBookData }: BookDetail
                 // Store the RAW content (with [p=...] patterns) so processImagePrompts can find them
                 setPageContent(data.content);
                 setIsPageCached(true);
-                setIsPageTransitioning(false); // End transition when content loads
+                
+                // Smooth transition to show cached content
+                setTimeout(() => {
+                    setIsPageTransitioning(false); // End transition when content loads
+                    setShowNewContent(true); // Fade in cached content
+                }, 150); // Small delay for smooth transition
+                
                 console.log('✅ Page content set from cache (keeping original [p=...] patterns)');
 
                 // Track page view when content is loaded from cache (debounced to avoid spam)
@@ -276,11 +290,13 @@ export default function BookDetailClient({ bookId, initialBookData }: BookDetail
                 }
             } else if (!data.exists && !isGenerating && !generationInProgress.current) {
                 // Content doesn't exist, trigger generation if user is authenticated
+                console.log('🔄 Page content missing, starting generation', user);
                 if (user) {
                     console.log('🔄 Page content missing, starting generation');
                     startGeneration();
                 } else {
                     setIsPageTransitioning(false); // End transition even if no content for unauthenticated users
+                    setShowNewContent(true);
                 }
             }
         },
@@ -290,6 +306,8 @@ export default function BookDetailClient({ bookId, initialBookData }: BookDetail
             toast.error('Failed to load page content');
             setPageContent('');
             setIsPageCached(false);
+            setIsPageTransitioning(false);
+            setShowNewContent(true);
         }
     )
 
@@ -359,6 +377,7 @@ export default function BookDetailClient({ bookId, initialBookData }: BookDetail
 
         generationInProgress.current = true
         setIsGenerating(true)
+        setStreamingContentKey(prev => prev + 1) // Reset streaming animation
 
         try {
             await append({
@@ -398,18 +417,22 @@ export default function BookDetailClient({ bookId, initialBookData }: BookDetail
         }
     }, [searchParams])
 
-        // Handle smooth page transitions
+    // Enhanced smooth page transitions with fade effects
     useEffect(() => {
         // When page changes, start transition and preserve previous content
-        setIsPageTransitioning(true)
-        setPreviousPageContent(pageContent)
+        setShowNewContent(false) // Fade out current content first
         
-        // Reset page state for new page
-        setPageContent('')
-        setIsPageCached(false)
+        setTimeout(() => {
+            setIsPageTransitioning(true)
+            setPreviousPageContent(pageContent)
+            
+            // Reset page state for new page
+            setPageContent('')
+            setIsPageCached(false)
+        }, 150) // Allow fade out to complete before starting transition
         
         // Scroll to top of the page content when changing pages
-        // Use a small delay to ensure smooth transition
+        // Use a delay to ensure smooth transition
         setTimeout(() => {
             // Find the scrollable content area and scroll to top
             const contentArea = document.querySelector('.page-content-scroll')
@@ -419,7 +442,7 @@ export default function BookDetailClient({ bookId, initialBookData }: BookDetail
                 // Fallback to window scroll if content area not found
                 window.scrollTo({ top: 0, behavior: 'smooth' })
             }
-        }, 100)
+        }, 200)
     }, [currentPage, currentEdition?.id])
 
     // Memoize the processed content to avoid unnecessary re-processing  
@@ -461,8 +484,6 @@ export default function BookDetailClient({ bookId, initialBookData }: BookDetail
             updatePageURL(newPage, undefined, true) // Create history entry for navigation
         }
     }
-
-
 
     const handleShare = async () => {
         // Use current URL which already has the page and edition cached
@@ -559,7 +580,7 @@ export default function BookDetailClient({ bookId, initialBookData }: BookDetail
                 />
 
                 {/* Main Content - Page Content */}
-                <div className="flex-1 p-4 md:p-4 pt-16 md:pt-4 flex flex-col">
+                <div className="flex-1 p-4 md:p-4 pt-8 md:pt-4 flex flex-col">
                     <Card className="flex-1 bg-white/95 backdrop-blur-md border border-mirage-border-primary shadow-xl rounded-xl overflow-hidden">
                         <div className="h-full flex flex-col">
                             <div className="px-4 py-3 md:px-6 md:py-4 border-b border-mirage-border-primary bg-white/90 flex-shrink-0">
@@ -660,24 +681,47 @@ export default function BookDetailClient({ bookId, initialBookData }: BookDetail
                                                 />
                                             </div>
 
-                                            {/* Show streaming content with markdown */}
-                                            <div className="prose prose-amber max-w-none">
+                                            {/* Show streaming content with enhanced fade-in markdown */}
+                                            <div 
+                                                key={streamingContentKey}
+                                                className="prose prose-amber max-w-none animate-in fade-in duration-300"
+                                                style={{
+                                                    animation: 'fadeInGently 400ms ease-out forwards'
+                                                }}
+                                            >
+                                                <style jsx>{`
+                                                    @keyframes fadeInGently {
+                                                        from { 
+                                                            opacity: 0; 
+                                                        }
+                                                        to { 
+                                                            opacity: 1; 
+                                                        }
+                                                    }
+                                                    @keyframes streamingGlow {
+                                                        0%, 100% { opacity: 0.7; }
+                                                        50% { opacity: 1; }
+                                                    }
+                                                    .streaming-text {
+                                                        animation: streamingGlow 2s ease-in-out infinite;
+                                                    }
+                                                `}</style>
                                                 <Markdown
                                                     components={{
-                                                        h1: ({ children }) => <h1 className="text-2xl font-bold text-mirage-text-primary mb-4">{children}</h1>,
-                                                        h2: ({ children }) => <h2 className="text-xl font-semibold text-mirage-text-primary mb-3">{children}</h2>,
-                                                        h3: ({ children }) => <h3 className="text-lg font-medium text-mirage-text-primary mb-2">{children}</h3>,
-                                                        p: ({ children }) => <p className={`text-mirage-text-primary mb-4 ${getFontSizeClasses(fontSize)}`}>{children}</p>,
-                                                        em: ({ children }) => <em className="text-mirage-text-secondary italic">{children}</em>,
-                                                        strong: ({ children }) => <strong className="text-mirage-text-primary font-semibold">{children}</strong>,
-                                                        ul: ({ children }) => <ul className={`list-disc list-inside mb-4 text-mirage-text-primary space-y-1 ${getFontSizeClasses(fontSize)}`}>{children}</ul>,
-                                                        ol: ({ children }) => <ol className={`list-decimal list-inside mb-4 text-mirage-text-primary space-y-1 ${getFontSizeClasses(fontSize)}`}>{children}</ol>,
-                                                        blockquote: ({ children }) => <blockquote className={`border-l-4 border-mirage-border-primary pl-4 italic text-mirage-text-secondary mb-4 ${getFontSizeClasses(fontSize)}`}>{children}</blockquote>,
+                                                        h1: ({ children }) => <h1 className="text-2xl font-bold text-mirage-text-primary mb-4 streaming-text">{children}</h1>,
+                                                        h2: ({ children }) => <h2 className="text-xl font-semibold text-mirage-text-primary mb-3 streaming-text">{children}</h2>,
+                                                        h3: ({ children }) => <h3 className="text-lg font-medium text-mirage-text-primary mb-2 streaming-text">{children}</h3>,
+                                                        p: ({ children }) => <p className={`text-mirage-text-primary mb-4 streaming-text ${getFontSizeClasses(fontSize)}`}>{children}</p>,
+                                                        em: ({ children }) => <em className="text-mirage-text-secondary italic streaming-text">{children}</em>,
+                                                        strong: ({ children }) => <strong className="text-mirage-text-primary font-semibold streaming-text">{children}</strong>,
+                                                        ul: ({ children }) => <ul className={`list-disc list-inside mb-4 text-mirage-text-primary space-y-1 streaming-text ${getFontSizeClasses(fontSize)}`}>{children}</ul>,
+                                                        ol: ({ children }) => <ol className={`list-decimal list-inside mb-4 text-mirage-text-primary space-y-1 streaming-text ${getFontSizeClasses(fontSize)}`}>{children}</ol>,
+                                                        blockquote: ({ children }) => <blockquote className={`border-l-4 border-mirage-border-primary pl-4 italic text-mirage-text-secondary mb-4 streaming-text ${getFontSizeClasses(fontSize)}`}>{children}</blockquote>,
                                                         img: ({ src, alt, ...props }) => (
                                                             <img
                                                                 src={src}
                                                                 alt={alt}
-                                                                className="w-full max-w-2xl mx-auto my-6 rounded-lg shadow-lg hover:scale-105 transition-transform duration-300"
+                                                                className="w-full max-w-2xl mx-auto my-6 rounded-lg shadow-lg hover:scale-105 transition-transform duration-300 streaming-text"
                                                                 loading="lazy"
                                                                 style={{ display: 'block' }}
                                                                 {...props}
@@ -694,9 +738,17 @@ export default function BookDetailClient({ bookId, initialBookData }: BookDetail
                                         </div>
                                     ) : pageContent || (isPageTransitioning && previousPageContent) ? (
                                         <div className="relative">
-                                                                        {/* Page transition loading indicator */}
-                            {isPageTransitioning && <PageTransitionLoading />}
-                                            <div className={`prose prose-amber max-w-none transition-opacity duration-300 ${isPageTransitioning ? 'opacity-60' : 'opacity-100'}`}>
+                                            {/* Page transition loading indicator */}
+                                            {isPageTransitioning && <PageTransitionLoading />}
+                                            <div 
+                                                className={`prose prose-amber max-w-none transition-opacity duration-300 ease-in-out ${
+                                                    isPageTransitioning 
+                                                        ? 'opacity-30' 
+                                                        : showNewContent 
+                                                            ? 'opacity-100' 
+                                                            : 'opacity-0'
+                                                }`}
+                                            >
                                                 <Markdown
                                                     components={{
                                                         h1: ({ children }) => <h1 className="text-2xl font-bold text-mirage-text-primary mb-4">{children}</h1>,

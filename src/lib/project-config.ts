@@ -20,6 +20,12 @@ export interface AISettings {
   existing_authors_probability: number
 }
 
+export interface ModelConfig {
+  genre_determination_model_id: number
+  author_generation_model_id: number
+  // Note: Book generation uses the user's selected model
+}
+
 export interface AppSettings {
   maintenance_mode: boolean
   max_pages_per_book: number
@@ -30,6 +36,7 @@ export interface ProjectConfig {
   feature_flags: FeatureFlags
   page_generation: PageGenerationConfig
   ai_settings: AISettings
+  model_config: ModelConfig
   app_settings: AppSettings
 }
 
@@ -127,6 +134,19 @@ export async function getAISettings(): Promise<AISettings> {
       max: config?.temperature_range?.max ?? 1.0
     },
     existing_authors_probability: config?.existing_authors_probability ?? 0.5
+  }
+}
+
+/**
+ * Get model configuration with fallbacks
+ */
+export async function getModelConfig(): Promise<ModelConfig> {
+  const config = await getProjectConfig('model_config')
+  
+  return {
+    // Default to model ID 1 (should be Gemini Flash or similar fast/cheap model)
+    genre_determination_model_id: config?.genre_determination_model_id ?? 1,
+    author_generation_model_id: config?.author_generation_model_id ?? 1
   }
 }
 

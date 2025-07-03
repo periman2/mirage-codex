@@ -61,7 +61,7 @@ export function BookInfoSidebar({
       {/* Mobile Book Info Button */}
       <Button
         onClick={() => !isOpen && onOpen()}
-        className="md:hidden fixed top-24 left-4 z-40 h-10 w-10 p-0 rounded-full shadow-lg"
+        className="md:hidden fixed top-17 left-4 z-40 h-10 w-10 p-0 rounded-2xl shadow-lg"
         style={{
           backgroundColor: 'rgb(217 119 6)',
           borderColor: 'rgb(217 119 6)',

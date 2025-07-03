@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { streamText } from 'ai'
 import { createSupabaseServerClient } from '@/lib/supabase'
-import { getAIProvider } from '@/lib/ai'
+import { getAIProvider, getProviderOptions } from '@/lib/ai'
 import { getPageGenerationCreditCost } from '@/lib/credit-constants'
 import { getPageGenerationConfig, isFeatureEnabled } from '@/lib/project-config'
 import fs from 'fs'
@@ -440,7 +440,8 @@ ${systemPrompt}`
     const result = streamText({
       model: aiProvider,
       messages: allMessages,
-      temperature: modelTemperature
+      temperature: modelTemperature,
+      ...(getProviderOptions(editionDetails.models.domain_code) && { providerOptions: getProviderOptions(editionDetails.models.domain_code) })
     })
 
     // Note: Credit deduction happens in the save endpoint when page is actually saved

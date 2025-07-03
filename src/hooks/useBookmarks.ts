@@ -55,14 +55,12 @@ export function useBookmarks({
   const [bookmarksLoading, setBookmarksLoading] = useState(false)
   const [isBookmarkDialogOpen, setIsBookmarkDialogOpen] = useState(false)
   const [isBookmarksListOpen, setIsBookmarksListOpen] = useState(false)
-
-  // Get existing bookmark for current page
-  const shouldFetchBookmark = isPageCached && !!user && !!currentEdition
+  
   const { 
     data: existingBookmark, 
     isLoading: bookmarkLoading, 
     error: bookmarkError 
-  } = useBookmark(user?.id, currentEdition?.id, currentPage, shouldFetchBookmark)
+  } = useBookmark(user?.id, currentEdition?.id, currentPage, true)
 
   // Load all bookmarks for current edition
   const loadAllBookmarks = useCallback(async () => {

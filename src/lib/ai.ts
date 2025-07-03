@@ -1,10 +1,36 @@
 import { generateObject, generateText, streamText } from 'ai'
 import { createOpenAI, openai } from '@ai-sdk/openai'
 import { anthropic } from '@ai-sdk/anthropic'
-import { google } from '@ai-sdk/google'
+import { google, GoogleGenerativeAIProviderOptions } from '@ai-sdk/google'
 import { z } from 'zod'
 
 const openaiModel = createOpenAI({ apiKey: process.env.OPENAI_API_KEY || '' });
+
+/**
+ * Get provider-specific options for AI SDK calls
+ * Centralizes all provider configurations for consistency across the app
+ */
+export function getProviderOptions(domain: string) {
+  switch (domain) {
+    case 'google':
+      return {
+        google: {
+          thinkingConfig: {
+            thinkingBudget: 1048,
+            includeThoughts: false
+          },
+        } satisfies GoogleGenerativeAIProviderOptions,
+      }
+    case 'openai':
+      // Return undefined when no specific options are needed
+      return undefined
+    case 'anthropic':
+      // Return undefined when no specific options are needed
+      return undefined
+    default:
+      return undefined
+  }
+}
 
 // Constants
 export const PAGE_SIZE = 3 // Number of books generated per search
@@ -120,6 +146,7 @@ CREATIVITY: Be highly creative and unexpected in your author creations. Think of
         system: systemPrompt,
         prompt: `Generate exactly ${params.count} diverse fictional authors who write in this genre. Make them unique and memorable.`,
         schema: dynamicSchema,
+        ...(getProviderOptions(params.modelDomain) && { providerOptions: getProviderOptions(params.modelDomain) }),
         temperature: 0.9, // High creativity
       })
 
@@ -203,6 +230,7 @@ Be decisive and confident in your analysis. Choose exactly one genre and one lan
 
 Return the exact slug/code from the available options, not custom values.`,
       schema: GenreLanguageDeterminationSchema,
+      ...(getProviderOptions(params.modelDomain) && { providerOptions: getProviderOptions(params.modelDomain) }),
       temperature: 0.1, // Low temperature for consistent classification
     })
 
@@ -286,18 +314,18 @@ Generate books that feel like they could exist in a parallel universe's literary
   if (process.env.NODE_ENV === 'development') {
     const fs = require('fs')
     const path = require('path')
-    
+
     // Create debug folder if it doesn't exist
     const debugDir = path.join(process.cwd(), 'debug')
     if (!fs.existsSync(debugDir)) {
       fs.mkdirSync(debugDir, { recursive: true })
     }
-    
+
     // Save system prompt with timestamp
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
     const filename = `generateBooks-system-prompt-${timestamp}.txt`
     const filepath = path.join(debugDir, filename)
-    
+
     fs.writeFileSync(filepath, systemPrompt, 'utf8')
     console.log(`📝 System prompt saved to: ${filepath}`)
   }
@@ -308,6 +336,7 @@ Generate books that feel like they could exist in a parallel universe's literary
     system: systemPrompt,
     prompt: `Generate exactly ${params.pageSize} diverse fictional books for page ${params.pageNumber}.`,
     schema: BookListSchema,
+    ...(getProviderOptions(params.modelDomain) && { providerOptions: getProviderOptions(params.modelDomain) }),
     temperature: 0.9, // High creativity as requested
   })
 

@@ -1,15 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient, createSupabaseAdminClient } from '@/lib/supabase'
-import { createSearchHash, validateSearchParams } from '@/lib/hash'
+import { createSearchHash } from '@/lib/hash'
 import { generateBooks, generateAuthors, determineGenreAndLanguage, PAGE_SIZE, AuthorSchema } from '@/lib/ai'
 import { getSearchCreditCost } from '@/lib/credit-constants'
-import { getProjectConfig } from '@/lib/project-config'
+import { getProjectConfig, getModelConfig } from '@/lib/project-config'
 import { z } from 'zod'
 import { SupabaseClient } from '@supabase/supabase-js'
-import { Database, Tables } from '@/lib/database.types'
+import { Database } from '@/lib/database.types'
 
 // Use database types for better type safety
-
 const SearchRequestSchema = z.object({
   freeText: z.string().max(10000, 'Search query cannot exceed 10,000 characters').optional(),
   languageCode: z.string().optional(),
@@ -18,7 +17,6 @@ const SearchRequestSchema = z.object({
   modelId: z.number(),
   pageNumber: z.number().min(1).default(1),
 });
-
 
 export const maxDuration = 60
 
@@ -268,28 +266,31 @@ export async function POST(request: NextRequest) {
         )
       }
       
-      // Use AI to determine genre and language
-      const { data: model } = await supabase
+      // Get utility model for genre determination (cheap/fast model)
+      const modelConfig = await getModelConfig()
+      const { data: utilityModel } = await supabase
         .from('models')
         .select('name, domain_code')
-        .eq('id', validatedInput.modelId)
+        .eq('id', modelConfig.genre_determination_model_id)
         .limit(1)
         .maybeSingle()
       
-      if (!model) {
-        console.error('❌ Model not found for AI determination')
+      if (!utilityModel) {
+        console.error('❌ Utility model not found for genre determination')
         return NextResponse.json(
-          { error: 'Invalid model' },
-          { status: 400 }
+          { error: 'Genre determination model not configured properly' },
+          { status: 500 }
         )
       }
+      
+      console.log(`🤖 Using utility model for genre determination: ${utilityModel.name} (ID: ${modelConfig.genre_determination_model_id})`)
       
       const determination = await determineGenreAndLanguage({
         freeText: validatedInput.freeText,
         availableGenres,
         availableLanguages,
-        modelName: model.name,
-        modelDomain: model.domain_code,
+        modelName: utilityModel.name,
+        modelDomain: utilityModel.domain_code,
       })
       
       console.log('🎯 AI determined genre and language:', determination)
@@ -377,13 +378,29 @@ export async function POST(request: NextRequest) {
     const tagPrompts = tags?.map(t => t.prompt_boost).filter((prompt): prompt is string => Boolean(prompt)) || []
     console.log('🏷️ Tag prompts:', tagPrompts)
 
+    // Get user's selected model for API key checking and credit calculations
+    const { data: userModel } = await supabase
+      .from('models')
+      .select('name, domain_code')
+      .eq('id', finalSearchParams.modelId)
+      .limit(1)
+      .maybeSingle()
+
+    if (!userModel) {
+      console.error('❌ User selected model not found for credit checking')
+      return NextResponse.json(
+        { error: 'Invalid model selected' },
+        { status: 400 }
+      )
+    }
+
     // Check for BYO API key first 
     console.log('🔑 Checking for user API key...')
     const { data: userApiKey } = await supabase
       .from('user_api_keys')
       .select('api_key_enc')
       .eq('user_id', user.id)
-      .eq('domain_code', model.domain_code)
+      .eq('domain_code', userModel.domain_code)
       .limit(1)
       .maybeSingle()
 
@@ -455,13 +472,29 @@ export async function POST(request: NextRequest) {
       const authorsNeeded = PAGE_SIZE - finalAuthors.length
       console.log(`🎨 Need to generate ${authorsNeeded} new authors`)
       
+      // Get utility model for author generation (cheap/fast model)
+      const modelConfig = await getModelConfig()
+      const { data: authorUtilityModel } = await supabase
+        .from('models')
+        .select('name, domain_code')
+        .eq('id', modelConfig.author_generation_model_id)
+        .limit(1)
+        .maybeSingle()
+      
+      if (!authorUtilityModel) {
+        console.error('❌ Utility model not found for author generation')
+        throw new Error('Author generation model not configured properly')
+      }
+      
+      console.log(`🤖 Using utility model for author generation: ${authorUtilityModel.name} (ID: ${modelConfig.author_generation_model_id})`)
+      
       // Generate new authors with retry logic
       console.log('🤖 Generating new authors...')
       const generatedAuthors = await generateAuthors({
         genrePrompt: genre.prompt_boost || `Generate authors for ${finalGenreSlug} genre`,
         languageCode: finalLanguageCode,
-        modelName: model.name,
-        modelDomain: model.domain_code,
+        modelName: authorUtilityModel.name,
+        modelDomain: authorUtilityModel.domain_code,
         freeText: finalSearchParams.freeText ?? undefined,
         count: authorsNeeded,
       })
@@ -478,8 +511,8 @@ export async function POST(request: NextRequest) {
     console.log(`👥 Final author lineup: ${finalAuthors.length} authors`)
     console.log('👥 Author names:', finalAuthors.map(a => a.penName))
 
-    // Generate new books using AI with the selected/generated authors
-    console.log('🤖 Generating books with model:', model.name, 'for domain:', model.domain_code)
+    // Generate new books using AI with the selected/generated authors (reuse userModel from earlier)
+    console.log('🤖 Generating books with user selected model:', userModel.name, 'for domain:', userModel.domain_code)
     console.log('🤖 Generation params:', {
       freeText: finalSearchParams.freeText,
       genrePrompt: genre.prompt_boost?.substring(0, 100) + '...',
@@ -495,8 +528,8 @@ export async function POST(request: NextRequest) {
       genrePrompt: genre.prompt_boost || `Generate ${finalGenreSlug} books`,
       tagPrompts,
       languageCode: finalLanguageCode,
-      modelName: model.name,
-      modelDomain: model.domain_code,
+      modelName: userModel.name,
+      modelDomain: userModel.domain_code,
       pageNumber: finalSearchParams.pageNumber,
       pageSize: finalSearchParams.pageSize,
       // Remove authorPenNames - we'll assign authors randomly after generation
