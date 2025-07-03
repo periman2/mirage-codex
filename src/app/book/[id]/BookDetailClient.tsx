@@ -180,7 +180,8 @@ export default function BookDetailClient({ bookId, initialBookData }: BookDetail
             const imageUrl = `/api/book/${bookId}/page/${currentPage}/image?prompt=${encodeURIComponent(trimmedPrompt)}&edition=${currentEdition.id}`
 
             // Simple markdown image syntax - let the browser handle loading
-            return `\n\n![Scene: ${trimmedPrompt}](${imageUrl})\n*${trimmedPrompt}*\n\n`
+            // return `\n\n![Scene: ${trimmedPrompt}](${imageUrl})\n*${trimmedPrompt}*\n\n`
+            return `\n\n![Scene: ${trimmedPrompt}](${imageUrl})`
         })
 
         return processedContent
