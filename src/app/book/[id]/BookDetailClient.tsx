@@ -28,7 +28,12 @@ interface BookDetailClientProps {
 
 export default function BookDetailClient({ bookId, initialBookData }: BookDetailClientProps) {
 
-    const { user } = useAuth()
+    const { user, loading } = useAuth()
+
+    if(loading) {
+        return <div>Loading...</div>
+    }
+
     const searchParams = useSearchParams()
     const router = useRouter()
     const editionId = searchParams?.get('edition') // Get edition from URL params
@@ -266,7 +271,7 @@ export default function BookDetailClient({ bookId, initialBookData }: BookDetail
         bookId,
         currentPage,
         currentEdition?.id,
-        !!user,
+        true,
         // onSuccess callback
         (data) => {
             console.log('📄 Page content loaded:', data);
