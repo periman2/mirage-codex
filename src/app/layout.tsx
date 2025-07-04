@@ -19,8 +19,8 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "MirageCodex - The Infinite AI-Generated Library",
-  description: "Discover and create infinite stories with AI. Browse existing books or generate new ones tailored to your imagination.",
+  title: "MirageCodex - The literature simulacrum",
+  description: "Discover and create infinite books with AI.",
   keywords: ["AI", "books", "literature", "fiction", "library", "reading"],
   authors: [{ name: "MirageCodex" }],
   icons: {
@@ -29,8 +29,8 @@ export const metadata: Metadata = {
     apple: "/logo.svg",
   },
   openGraph: {
-    title: "MirageCodex - The Infinite AI-Generated Library",
-    description: "Discover and create infinite stories with AI. Browse existing books or generate new ones tailored to your imagination.",
+    title: "MirageCodex - The literature simulacrum",
+    description: "Discover and create infinite stories with AI.",
     type: "website",
     images: ["/logo.svg"],
   },

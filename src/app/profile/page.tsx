@@ -13,6 +13,7 @@ import { Separator } from '@/components/ui/separator'
 import { User, CreditCard, Calendar, TrendingUp, Edit3, Camera, CheckCircle } from 'lucide-react'
 import { toast } from 'sonner'
 import { DEFAULT_SEARCH_CREDITS, DEFAULT_PAGE_GENERATION_CREDITS, getModelOperationsRemaining } from '@/lib/credit-constants'
+import { ProfileImageUpload } from '@/components/profile-image-upload'
 
 interface UserBillingInfo {
   credits: number
@@ -219,23 +220,16 @@ export default function ProfilePage() {
             <CardContent className="space-y-4">
               {/* Avatar */}
               <div className="flex flex-col items-center space-y-3">
-                <div className="relative">
-                  <Avatar className="h-20 w-20">
-                    <AvatarImage src={profile?.avatar_url || undefined} />
-                    <AvatarFallback className="text-lg font-semibold">
-                      {(profile?.display_name || user.email || 'U').charAt(0).toUpperCase()}
-                    </AvatarFallback>
-                  </Avatar>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="absolute -bottom-2 -right-2 h-8 w-8 rounded-full p-0"
-                    disabled
-                    title="Avatar upload coming soon"
-                  >
-                    <Camera className="h-4 w-4" />
-                  </Button>
-                </div>
+                <ProfileImageUpload
+                  userId={user.id}
+                  currentAvatarUrl={profile?.avatar_url}
+                  displayName={profile?.display_name}
+                  userEmail={user.email}
+                  onImageUpdated={(newAvatarUrl) => {
+                    setProfile(prev => prev ? { ...prev, avatar_url: newAvatarUrl } : null)
+                  }}
+                />
+              </div>
                 
                 {/* Display Name */}
                 <div className="text-center w-full">
@@ -294,7 +288,6 @@ export default function ProfilePage() {
                     </div>
                   )}
                 </div>
-              </div>
 
               <Separator />
 
