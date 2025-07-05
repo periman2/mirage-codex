@@ -3,7 +3,10 @@ import { useQuery } from '@tanstack/react-query'
 interface BookEdition {
   id: string
   modelId: number
+  languageId: number
   modelName: string
+  language: string
+  languageCode: string
 }
 
 interface BookData {

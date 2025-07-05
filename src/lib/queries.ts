@@ -49,7 +49,7 @@ export const queryKeys = {
 // Languages
 export function useLanguages() {
   const supabase = createSupabaseBrowserClient()
-  
+
   return useQuery({
     queryKey: queryKeys.languages.list(),
     queryFn: async () => {
@@ -57,7 +57,7 @@ export function useLanguages() {
         .from('languages')
         .select('*')
         .order('label')
-      
+
       if (error) throw error
       return data
     },
@@ -68,7 +68,7 @@ export function useLanguages() {
 // Genres
 export function useGenres() {
   const supabase = createSupabaseBrowserClient()
-  
+
   return useQuery({
     queryKey: queryKeys.genres.list(),
     queryFn: async () => {
@@ -77,7 +77,7 @@ export function useGenres() {
         .select('*')
         .eq('is_active', true)
         .order('order_index')
-      
+
       if (error) throw error
       return data
     },
@@ -88,7 +88,7 @@ export function useGenres() {
 // Models
 export function useModels() {
   const supabase = createSupabaseBrowserClient()
-  
+
   return useQuery({
     queryKey: queryKeys.models.list(),
     queryFn: async () => {
@@ -111,18 +111,18 @@ export function useModels() {
         .eq('is_active', true)
         .order('domain_code')
         .order('name')
-      
+
       if (error) throw error
       return data
     },
-    staleTime: 30 * 60 * 1000, // 30 minutes - models don't change often
+    staleTime: 1 * 60 * 1000, // 30 minutes - models don't change often
   })
 }
 
 // Tags
 export function useTags() {
   const supabase = createSupabaseBrowserClient()
-  
+
   return useQuery({
     queryKey: queryKeys.tags.list(),
     queryFn: async () => {
@@ -139,23 +139,23 @@ export function useTags() {
         `)
         .eq('is_active', true)
         .order('label')
-      
+
       if (error) throw error
       return data
     },
-    staleTime: 30 * 60 * 1000, // 30 minutes
+    staleTime: 1 * 60 * 1000, // 30 minutes
   })
 }
 
 // Tags filtered by genre
 export function useTagsByGenre(genreId?: string) {
   const supabase = createSupabaseBrowserClient()
-  
+
   return useQuery({
     queryKey: queryKeys.tags.byGenre(genreId),
     queryFn: async () => {
       if (!genreId) return []
-      
+
       const { data, error } = await supabase
         .from('genre_tags')
         .select(`
@@ -174,12 +174,12 @@ export function useTagsByGenre(genreId?: string) {
         `)
         .eq('genre_id', genreId)
         .order('tags(label)')
-      
+
       if (error) throw error
       return data?.map(gt => gt.tags).filter(Boolean) || []
     },
     enabled: !!genreId,
-    staleTime: 30 * 60 * 1000, // 30 minutes
+    staleTime: 1 * 60 * 1000, // 30 minutes
   })
 }
 
@@ -191,13 +191,13 @@ export function useBooks(filters: {
   search?: string
 } = {}) {
   const supabase = createSupabaseBrowserClient()
-  
+
   return useInfiniteQuery({
     queryKey: queryKeys.books.list(filters),
     queryFn: async ({ pageParam = 0 }) => {
       const from = pageParam * 20
       const to = from + 19
-      
+
       let query = supabase
         .from('books')
         .select(`
@@ -224,22 +224,22 @@ export function useBooks(filters: {
         `)
         .range(from, to)
         .order('created_at', { ascending: false })
-      
+
       // Apply filters
       if (filters.language_id) {
         query = query.eq('primary_language_id', filters.language_id)
       }
-      
+
       if (filters.genre_id) {
         query = query.eq('genre_id', filters.genre_id)
       }
-      
+
       if (filters.search) {
         query = query.or(`title.ilike.%${filters.search}%,summary.ilike.%${filters.search}%`)
       }
-      
+
       const { data, error } = await query
-      
+
       if (error) throw error
       return (data || []).map(transformBookWithStats).filter(Boolean)
     },
@@ -247,20 +247,20 @@ export function useBooks(filters: {
       return lastPage.length === 20 ? allPages.length : undefined
     },
     initialPageParam: 0,
-    staleTime: 2 * 60 * 1000, // 2 minutes
+    staleTime: 0,
   })
 }
 
 // User's searched books (books from their search results) - Fixed query structure
 export function useUserSearchedBooks(userId: string, limit: number = 10) {
   const supabase = createSupabaseBrowserClient()
-  
+
   return useInfiniteQuery({
     queryKey: queryKeys.books.userSearched(userId, limit),
     queryFn: async ({ pageParam = 0 }) => {
       const from = pageParam * limit
       const to = from + limit - 1
-      
+
       // First get the search IDs for this user, ordered by creation date
       const { data: searchIds, error: searchError } = await supabase
         .from('searches')
@@ -268,10 +268,10 @@ export function useUserSearchedBooks(userId: string, limit: number = 10) {
         .eq('user_id', userId)
         .order('created_at', { ascending: false })
         .range(from, to)
-      
+
       if (searchError) throw searchError
       if (!searchIds?.length) return []
-      
+
       // Then get books from those searches
       const { data: searchBooks, error: booksError } = await supabase
         .from('search_books')
@@ -310,15 +310,15 @@ export function useUserSearchedBooks(userId: string, limit: number = 10) {
         `)
         .in('search_id', searchIds.map(s => s.id))
         .order('rank', { ascending: true })
-      
+
       if (booksError) throw booksError
-      
+
       // Flatten and deduplicate books
       const books = searchBooks?.map(item => item.books).filter(Boolean) || []
-      const uniqueBooks = books.filter((book, index, self) => 
+      const uniqueBooks = books.filter((book, index, self) =>
         index === self.findIndex(b => b?.id === book?.id)
       )
-      
+
       return uniqueBooks.map(transformBookWithStats).filter(Boolean)
     },
     getNextPageParam: (lastPage, allPages) => {
@@ -326,20 +326,20 @@ export function useUserSearchedBooks(userId: string, limit: number = 10) {
     },
     initialPageParam: 0,
     enabled: !!userId,
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 1 * 60 * 1000, // 5 minutes
   })
 }
 
 // User's liked books (most recently liked first)
 export function useUserLikedBooks(userId: string, limit: number = 10) {
   const supabase = createSupabaseBrowserClient()
-  
+
   return useInfiniteQuery({
     queryKey: queryKeys.books.userLiked(userId, limit),
     queryFn: async ({ pageParam = 0 }) => {
       const from = pageParam * limit
       const to = from + limit - 1
-      
+
       const { data, error } = await supabase
         .from('book_reactions')
         .select(`
@@ -379,9 +379,9 @@ export function useUserLikedBooks(userId: string, limit: number = 10) {
         .eq('reaction_type', 'like')
         .order('created_at', { ascending: false })
         .range(from, to)
-      
+
       if (error) throw error
-      
+
       // Extract books and transform them
       const books = data?.map(reaction => reaction.books).filter(Boolean) || []
       return books.map(transformBookWithStats).filter(Boolean)
@@ -391,20 +391,20 @@ export function useUserLikedBooks(userId: string, limit: number = 10) {
     },
     initialPageParam: 0,
     enabled: !!userId,
-    staleTime: 2 * 60 * 1000, // 2 minutes - likes can change frequently
+    staleTime: 1 * 60 * 1000, // 2 minutes - likes can change frequently
   })
 }
 
 // Latest releases (most recently created books) - Converted to infinite query
 export function useLatestBooks(limit: number = 10) {
   const supabase = createSupabaseBrowserClient()
-  
+
   return useInfiniteQuery({
     queryKey: queryKeys.books.latest(limit),
     queryFn: async ({ pageParam = 0 }) => {
       const from = pageParam * limit
       const to = from + limit - 1
-      
+
       const { data, error } = await supabase
         .from('books')
         .select(`
@@ -440,7 +440,7 @@ export function useLatestBooks(limit: number = 10) {
         `)
         .order('created_at', { ascending: false })
         .range(from, to)
-      
+
       if (error) throw error
       return (data || []).map(transformBookWithStats).filter(Boolean)
     },
@@ -448,20 +448,20 @@ export function useLatestBooks(limit: number = 10) {
       return lastPage.length === limit ? allPages.length : undefined
     },
     initialPageParam: 0,
-    staleTime: 2 * 60 * 1000, // 2 minutes
+    staleTime: 1 * 60 * 1000, // 2 minutes
   })
 }
 
 // Books by specific genre - Converted to infinite query
 export function useBooksByGenre(genreSlug: string, limit: number = 10) {
   const supabase = createSupabaseBrowserClient()
-  
+
   return useInfiniteQuery({
     queryKey: queryKeys.books.byGenre(genreSlug, limit),
     queryFn: async ({ pageParam = 0 }) => {
       const from = pageParam * limit
       const to = from + limit - 1
-      
+
       const { data, error } = await supabase
         .from('books')
         .select(`
@@ -498,7 +498,7 @@ export function useBooksByGenre(genreSlug: string, limit: number = 10) {
         .eq('genres.slug', genreSlug)
         .order('created_at', { ascending: false })
         .range(from, to)
-      
+
       if (error) throw error
       return (data || []).map(transformBookWithStats).filter(Boolean)
     },
@@ -507,14 +507,14 @@ export function useBooksByGenre(genreSlug: string, limit: number = 10) {
     },
     initialPageParam: 0,
     enabled: !!genreSlug,
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 1 * 60 * 1000, // 5 minutes
   })
 }
 
 // Single book details - Updated to include genre
 export function useBook(bookId: string) {
   const supabase = createSupabaseBrowserClient()
-  
+
   return useQuery({
     queryKey: queryKeys.books.detail(bookId),
     queryFn: async () => {
@@ -558,7 +558,7 @@ export function useBook(bookId: string) {
         .eq('id', bookId)
         .limit(1)
         .maybeSingle()
-      
+
       if (error) throw error
       return data
     },
@@ -570,12 +570,12 @@ export function useBook(bookId: string) {
 // User's searches
 export function useUserSearches(userId?: string) {
   const supabase = createSupabaseBrowserClient()
-  
+
   return useQuery({
     queryKey: queryKeys.searches.list({ userId }),
     queryFn: async () => {
       if (!userId) return []
-      
+
       const { data, error } = await supabase
         .from('searches')
         .select(`
@@ -603,32 +603,32 @@ export function useUserSearches(userId?: string) {
         `)
         .eq('user_id', userId)
         .order('created_at', { ascending: false })
-      
+
       if (error) throw error
       return data || []
     },
     enabled: !!userId,
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 1 * 60 * 1000, // 5 minutes
   })
 }
 
 // Random book
 export function useRandomBook() {
   const supabase = createSupabaseBrowserClient()
-  
+
   return useQuery({
     queryKey: queryKeys.books.random(),
     queryFn: async () => {
       const { data, error } = await supabase.rpc('get_random_book')
-      
+
       if (error) throw error
-      
+
       if (!data || data.length === 0) {
         return null
       }
-      
+
       const book = data[0]
-      
+
       // Transform the RPC result to match our SearchResultBook type
       return {
         id: book.book_id,
@@ -657,31 +657,30 @@ export function useRandomBook() {
     },
     enabled: false, // Only fetch when explicitly triggered
     staleTime: 0, // Always fresh random results
-    gcTime: 0, // Don't cache random results
   })
 }
 
 // Adjacent pages (previous and next) to check if they're already generated
 export function useAdjacentPages(editionId: string | null, currentPage: number, totalPages: number) {
   const supabase = createSupabaseBrowserClient()
-  
+
   return useQuery({
     queryKey: queryKeys.pages.adjacent(editionId || '', currentPage),
     queryFn: async () => {
       if (!editionId) return { prevPage: null, nextPage: null }
-      
+
       const pagesToCheck = []
-      
+
       // Check previous page if not on first page
       if (currentPage > 1) {
         pagesToCheck.push(currentPage - 1)
       }
-      
+
       // Check next page if not on last page
       if (currentPage < totalPages) {
         pagesToCheck.push(currentPage + 1)
       }
-      
+
       if (pagesToCheck.length === 0) {
         return { prevPage: null, nextPage: null }
       }
@@ -693,12 +692,12 @@ export function useAdjacentPages(editionId: string | null, currentPage: number, 
         .in('page_number', pagesToCheck)
 
       console.log('book_pages data: ', data)
-      
+
       if (error) throw error
-      
+
       const prevPage = data?.find(p => p.page_number === currentPage - 1) || null
       const nextPage = data?.find(p => p.page_number === currentPage + 1) || null
-      
+
       return { prevPage, nextPage }
     },
     enabled: !!editionId && totalPages > 0,

@@ -29,11 +29,6 @@ interface BookDetailClientProps {
 export default function BookDetailClient({ bookId, initialBookData }: BookDetailClientProps) {
 
     const { user, loading } = useAuth()
-
-    if(loading) {
-        return <div>Loading...</div>
-    }
-
     const searchParams = useSearchParams()
     const router = useRouter()
     const editionId = searchParams?.get('edition') // Get edition from URL params
@@ -351,24 +346,29 @@ export default function BookDetailClient({ bookId, initialBookData }: BookDetail
         const newURL = `/book/${bookId}${params.toString() ? '?' + params.toString() : ''}`
 
         if (createHistoryEntry) {
-            // Create a new history entry for page navigation
             router.push(newURL, { scroll: false })
         } else {
-            // Replace current history entry (for initial loads)
             router.replace(newURL, { scroll: false })
         }
     }
 
     // Function to handle edition switching
-    const handleEditionChange = (newEditionId: string) => {
+    const handleEditionChange = (newEditionId: string, isNewEdition?: boolean) => {
         // Reset page content when switching editions
         setPageContent('')
         setIsPageCached(false)
 
-        // Update URL with new edition (create history entry for edition changes)
-        updatePageURL(currentPage, newEditionId, true)
+        // Always redirect to page 1 when switching editions
+        const targetPage = 1
+        
+        if (currentPage !== 1) {
+            setCurrentPage(1)
+        }
 
-        toast.success('Switched to different edition')
+        // Update URL with new edition (create history entry for edition changes)
+        updatePageURL(targetPage, newEditionId, true)
+
+        toast.success(isNewEdition ? 'New edition created!' : 'Switched to different edition')
     }
 
     // Function to start generation using useChat

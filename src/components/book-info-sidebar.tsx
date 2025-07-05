@@ -9,6 +9,7 @@ import { Book, Heart, Users, List } from 'lucide-react'
 import { type BookData, type BookEdition } from '@/hooks/useBookData'
 import { type User } from '@supabase/supabase-js'
 import { AuthorDialog } from './author-dialog'
+import { EditionManager } from './edition-manager'
 
 interface BookStats {
   likes: number
@@ -29,7 +30,7 @@ interface BookInfoSidebarProps {
   isOpen: boolean
   onClose: () => void
   onOpen: () => void
-  onEditionChange: (editionId: string) => void
+  onEditionChange: (editionId: string, isNewEdition?: boolean) => void
   user: User | null
   bookStats: BookStats | undefined
   optimisticBookLike: { liked: boolean; count: number } | null
@@ -160,30 +161,14 @@ export function BookInfoSidebar({
                 </div>
               </div>
               
-              {/* Edition Selection */}
-              {book.editions.length > 1 && (
-                <div className="space-y-2">
-                  <Label htmlFor="edition-select" className="text-sm font-medium text-mirage-text-primary">
-                    Edition
-                  </Label>
-                  <Select value={currentEdition?.id || ''} onValueChange={onEditionChange}>
-                    <SelectTrigger className="w-full bg-white/90 border-mirage-border-primary">
-                      <SelectValue placeholder="Select edition" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {book.editions.map((edition) => (
-                        <SelectItem key={edition.id} value={edition.id}>
-                          {edition.modelName}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-              
-              <p className="text-sm text-mirage-text-muted">
-                Generated with {currentEdition?.modelName || 'Unknown Model'}
-              </p>
+              {/* Edition Management */}
+              <EditionManager
+                bookId={book.id}
+                editions={book.editions}
+                currentEdition={currentEdition}
+                onEditionChange={onEditionChange}
+                user={user}
+              />
             </div>
 
             {/* Book Summary */}

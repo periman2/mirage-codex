@@ -64,11 +64,16 @@ export async function fetchBookData(bookId: string): Promise<BookData | null> {
       .select(`
         id,
         model_id,
+        language_id,
         models (
           name,
           model_domains (
             label
           )
+        ),
+        languages (
+          code,
+          label
         )
       `)
       .eq('book_id', bookId)
@@ -108,7 +113,10 @@ export async function fetchBookData(bookId: string): Promise<BookData | null> {
       editions: editions.map(edition => ({
         id: edition.id,
         modelId: edition.model_id,
-        modelName: `${edition.models.model_domains.label} - ${edition.models.name}`
+        languageId: edition.language_id,
+        modelName: `${edition.models.model_domains.label} - ${edition.models.name}`,
+        language: edition.languages.label,
+        languageCode: edition.languages.code
       })),
       stats: {
         likes: book.book_stats?.likes_cnt || 0,
